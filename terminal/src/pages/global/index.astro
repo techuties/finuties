@@ -1,0 +1,333 @@
+---
+import DashboardLayout from '../../layouts/DashboardLayout.astro';
+---
+
+<DashboardLayout
+  title="Global Situation — FinUties"
+  description="Unified global situation map with geopolitical events, natural disasters, maritime, economic, and environmental data."
+  active="global"
+>
+  <!-- Full-height layout -->
+  <div class="flex flex-col" style="height:calc(100vh - 64px)">
+
+    <!-- Category Nav Bar -->
+    <nav id="cat-nav" role="tablist" aria-label="Data categories" class="flex items-center gap-1 px-4 py-2 border-b border-fin-800 bg-fin-900/80 shrink-0 overflow-x-auto">
+      <button type="button" role="tab" aria-selected="true" data-cat="all" class="cat-tab active rounded-full px-3 py-1 text-xs font-medium transition-all whitespace-nowrap">
+        <span class="inline-flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3" /></svg>
+          All Sources
+          <span id="badge-all" class="cat-badge hidden rounded-full bg-white/10 px-1.5 text-[9px] tabular-nums"></span>
+        </span>
+      </button>
+    </nav>
+
+    <!-- Main Area: sidebar + map + table -->
+    <div class="flex flex-1 min-h-0">
+
+      <!-- Sidebar -->
+      <aside id="sidebar" aria-label="Filters and summary" class="w-[260px] border-r border-fin-800 bg-fin-900/60 overflow-y-auto shrink-0 text-sm flex flex-col">
+        <!-- View Toggle -->
+        <div class="px-3 py-2 border-b border-fin-800 flex items-center gap-1" role="radiogroup" aria-label="View mode">
+          <button type="button" role="radio" aria-checked="true" data-view="map" class="view-btn active flex-1 rounded px-2 py-1 text-[10px] font-medium transition-all text-center">Map</button>
+          <button type="button" role="radio" aria-checked="false" data-view="table" class="view-btn flex-1 rounded px-2 py-1 text-[10px] font-medium transition-all text-center">Table</button>
+          <button type="button" role="radio" aria-checked="false" data-view="split" class="view-btn flex-1 rounded px-2 py-1 text-[10px] font-medium transition-all text-center">Split</button>
+        </div>
+
+        <!-- Layer Toggles -->
+        <div id="layer-toggles" class="px-3 py-2 border-b border-fin-800 space-y-1" aria-label="Data layers"></div>
+
+        <!-- Time Range -->
+        <div class="px-3 py-2 border-b border-fin-800 space-y-1.5">
+          <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Time Range</p>
+          <div class="flex flex-wrap gap-1" id="time-presets" role="group" aria-label="Time presets">
+            <button type="button" data-days="30" class="time-preset rounded border border-fin-700 bg-fin-800 px-2 py-0.5 text-[10px] text-slate-400 hover:border-fin-500 hover:text-white transition-all">30d</button>
+            <button type="button" data-days="90" class="time-preset rounded border border-fin-700 bg-fin-800 px-2 py-0.5 text-[10px] text-slate-400 hover:border-fin-500 hover:text-white transition-all">90d</button>
+            <button type="button" data-days="365" class="time-preset active-preset rounded border border-fin-500 bg-fin-600/20 px-2 py-0.5 text-[10px] text-fin-400 font-medium">1y</button>
+            <button type="button" data-days="1825" class="time-preset rounded border border-fin-700 bg-fin-800 px-2 py-0.5 text-[10px] text-slate-400 hover:border-fin-500 hover:text-white transition-all">5y</button>
+            <button type="button" data-days="0" class="time-preset rounded border border-fin-700 bg-fin-800 px-2 py-0.5 text-[10px] text-slate-400 hover:border-fin-500 hover:text-white transition-all">All</button>
+          </div>
+          <div class="grid grid-cols-2 gap-1.5">
+            <div>
+              <label for="filter-start" class="text-[10px] text-slate-600">From</label>
+              <input type="date" id="filter-start" class="w-full bg-fin-800 border border-fin-700 rounded px-1.5 py-1 text-[11px] text-slate-200 focus:border-fin-500 focus:outline-none focus:ring-1 focus:ring-fin-500/30" />
+            </div>
+            <div>
+              <label for="filter-end" class="text-[10px] text-slate-600">To</label>
+              <input type="date" id="filter-end" class="w-full bg-fin-800 border border-fin-700 rounded px-1.5 py-1 text-[11px] text-slate-200 focus:border-fin-500 focus:outline-none focus:ring-1 focus:ring-fin-500/30" />
+            </div>
+          </div>
+          <button id="btn-apply" type="button" class="w-full rounded bg-fin-600 px-2 py-1.5 text-[10px] font-medium text-white hover:bg-fin-500 active:scale-[0.98] transition-all focus:outline-none focus:ring-2 focus:ring-fin-500/40">
+            Apply Filters
+          </button>
+        </div>
+
+        <!-- Country Filter -->
+        <div class="px-3 py-2 border-b border-fin-800">
+          <label for="filter-country" class="sr-only">Filter by country</label>
+          <input type="text" id="filter-country" placeholder="Filter by country (e.g. USA, DEU)..." class="w-full bg-fin-800 border border-fin-700 rounded px-2 py-1.5 text-[11px] text-slate-200 placeholder:text-slate-600 focus:border-fin-500 focus:outline-none focus:ring-1 focus:ring-fin-500/30" />
+        </div>
+
+        <!-- KPI Summary -->
+        <div id="kpi-panel" class="px-3 py-2 border-b border-fin-800" aria-live="polite">
+          <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Summary</p>
+          <div id="kpi-grid" class="grid grid-cols-2 gap-1.5"></div>
+        </div>
+
+        <!-- Mini chart -->
+        <div class="px-3 py-2 flex-1 min-h-0">
+          <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Activity Trend</p>
+          <div id="sparkline-chart" class="w-full" style="height:100px" role="img" aria-label="Activity trend sparkline"></div>
+        </div>
+      </aside>
+
+      <!-- Content Area -->
+      <div class="flex-1 flex flex-col min-w-0">
+        <div id="content-area" class="flex-1 min-h-0 flex relative">
+          <!-- Map panel -->
+          <div id="map-panel" class="flex-1 min-h-0 relative">
+            <div id="geo-map" style="width:100%;height:100%" role="img" aria-label="Interactive world map showing global data"></div>
+
+            <!-- Map Navigation Controls -->
+            <div id="map-nav" class="absolute z-[5] flex flex-col gap-1" style="bottom:16px;left:16px" role="toolbar" aria-label="Map navigation">
+              <!-- Zoom controls -->
+              <div class="map-nav-group">
+                <button type="button" data-action="zoom-in" class="map-nav-btn" aria-label="Zoom in" title="Zoom in (+)">
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m6-6H6"/></svg>
+                </button>
+                <button type="button" data-action="zoom-out" class="map-nav-btn" aria-label="Zoom out" title="Zoom out (-)">
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M18 12H6"/></svg>
+                </button>
+              </div>
+              <!-- Directional pad -->
+              <div class="map-nav-group map-nav-dpad">
+                <button type="button" data-action="pan-up" class="map-nav-btn map-dpad-up" aria-label="Pan up" title="Pan up (Arrow Up)">
+                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7"/></svg>
+                </button>
+                <div class="flex">
+                  <button type="button" data-action="pan-left" class="map-nav-btn" aria-label="Pan left" title="Pan left (Arrow Left)">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+                  </button>
+                  <button type="button" data-action="pan-right" class="map-nav-btn" aria-label="Pan right" title="Pan right (Arrow Right)">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                  </button>
+                </div>
+                <button type="button" data-action="pan-down" class="map-nav-btn map-dpad-down" aria-label="Pan down" title="Pan down (Arrow Down)">
+                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+              </div>
+              <!-- Reset -->
+              <div class="map-nav-group">
+                <button type="button" data-action="reset" class="map-nav-btn map-nav-wide" aria-label="Reset map view" title="Reset view (press 0 or Home)">
+                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5"/><path stroke-linecap="round" stroke-linejoin="round" d="M20.49 9A9 9 0 005.64 5.64L4 4m16 16l-1.64-1.64A9 9 0 013.51 15"/></svg>
+                  <span class="text-[9px] font-medium leading-none">Reset</span>
+                </button>
+              </div>
+            </div>
+            <div class="absolute z-[5] text-[9px] text-slate-500 bg-fin-900/70 border border-fin-800 rounded px-2 py-1 pointer-events-none hidden lg:block" style="bottom:16px;left:112px">
+              Arrows: pan · +/-: zoom · 0/Home: reset
+            </div>
+
+            <!-- Empty state message -->
+            <div id="map-empty" class="absolute inset-0 flex items-center justify-center pointer-events-none z-[2]" style="display:none">
+              <div class="bg-fin-900/80 backdrop-blur-sm rounded-lg px-4 py-3 text-center border border-fin-800">
+                <p class="text-sm text-slate-400">No data loaded</p>
+                <p class="text-[10px] text-slate-600 mt-1">Try adjusting your filters or time range</p>
+              </div>
+            </div>
+
+            <!-- Loading overlay -->
+            <div id="map-loading" class="absolute inset-0 flex items-center justify-center bg-fin-950/80 z-10" aria-live="polite">
+              <div class="flex flex-col items-center gap-3">
+                <div id="loading-spinner" class="w-8 h-8 border-2 border-fin-600 border-t-transparent rounded-full animate-spin"></div>
+                <p id="loading-msg" class="text-sm text-slate-400">Loading global data...</p>
+                <button id="loading-retry" type="button" class="hidden rounded bg-fin-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-fin-500 focus:outline-none focus:ring-2 focus:ring-fin-500/40">Retry</button>
+              </div>
+            </div>
+          </div>
+          <!-- Table panel -->
+          <div id="table-panel" class="overflow-auto bg-fin-950" style="display:none">
+            <table id="data-table" class="w-full text-xs text-left" aria-label="Global data table">
+              <thead id="table-head" class="sticky top-0 bg-fin-900 z-5"></thead>
+              <tbody id="table-body"></tbody>
+            </table>
+            <div id="table-empty" class="p-8 text-center text-slate-500 text-sm" style="display:none">No data available for the selected filters.</div>
+          </div>
+        </div>
+
+        <!-- Timeline strip -->
+        <div class="border-t border-fin-800 bg-fin-900/80 shrink-0" style="height:72px">
+          <div id="timeline-chart" class="w-full h-full" role="img" aria-label="Event timeline by category"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    body { overflow: hidden; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    #sidebar::-webkit-scrollbar { width: 3px; }
+    #sidebar::-webkit-scrollbar-thumb { background: rgba(100,116,139,0.25); border-radius: 2px; }
+    #sidebar::-webkit-scrollbar-track { background: transparent; }
+    .cat-tab { color: #94a3b8; background: transparent; border: 1px solid transparent; }
+    .cat-tab:hover { color: #e2e8f0; background: rgba(30,41,59,0.5); }
+    .cat-tab.active { color: #fff; border-color: var(--cat-color, #3b82f6); background: color-mix(in srgb, var(--cat-color, #3b82f6) 15%, transparent); }
+    .cat-tab:focus-visible { outline: 2px solid var(--cat-color, #3b82f6); outline-offset: 1px; }
+    .cat-badge { min-width: 16px; text-align: center; }
+    .view-btn { color: #64748b; background: transparent; }
+    .view-btn:hover { color: #e2e8f0; }
+    .view-btn.active { color: #fff; background: #1e3a5f; }
+    .view-btn:focus-visible { outline: 2px solid #3b82f6; outline-offset: 1px; }
+    #data-table th { padding: 6px 10px; font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #1e293b; cursor: pointer; user-select: none; white-space: nowrap; }
+    #data-table th:hover { color: #e2e8f0; }
+    #data-table th .sort-icon { margin-left: 2px; opacity: 0.4; }
+    #data-table th.sorted .sort-icon { opacity: 1; color: #3b82f6; }
+    #data-table td { padding: 5px 10px; border-bottom: 1px solid #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+    #data-table tr:hover td { background: rgba(30,41,59,0.4); }
+    .badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 500; }
+    #table-panel::-webkit-scrollbar { width: 5px; height: 5px; }
+    #table-panel::-webkit-scrollbar-thumb { background: rgba(100,116,139,0.3); border-radius: 2px; }
+    .active-preset { border-color: #2563eb40; background: #2563eb15; color: #60a5fa; font-weight: 500; }
+    .map-nav-group { display: flex; flex-direction: column; align-items: center; background: #0f172adc; border: 1px solid #1e293b; border-radius: 8px; overflow: hidden; backdrop-filter: blur(8px); }
+    .map-nav-btn { display: flex; align-items: center; justify-content: center; width: 32px; height: 28px; color: #94a3b8; background: transparent; border: none; cursor: pointer; transition: background 0.15s, color 0.15s; }
+    .map-nav-btn:hover { color: #e2e8f0; background: #1e3a5f; }
+    .map-nav-btn:active { background: #2563eb40; }
+    .map-nav-btn:focus-visible { outline: 2px solid #3b82f6; outline-offset: -2px; z-index: 1; }
+    .map-nav-wide { width: auto; gap: 4px; padding: 0 10px; }
+    .map-nav-dpad { gap: 0; }
+    .map-nav-dpad .flex { gap: 0; }
+    .map-dpad-up, .map-dpad-down { width: 32px; }
+  </style>
+
+  <script>
+    import { initGeoChart } from '../../lib/geo-map';
+    import { defaultStartDate } from '../../lib/global-data-api';
+    import {
+      state, dom, charts, initDom,
+      MAP_CATEGORIES,
+      showLoading, showError,
+      applyViewMode, buildLayerToggles,
+      loadData, mapNav, setupMapClicks,
+      refreshViews,
+      type ActiveCat, type ViewMode,
+    } from '../../lib/global/index';
+
+    // ── Init DOM refs ────────────────────────────────────────────
+    initDom();
+
+    // ── Set default dates ────────────────────────────────────────
+    if (dom.endInput) dom.endInput.value = new Date().toISOString().slice(0, 10);
+    if (dom.startInput) dom.startInput.value = defaultStartDate(365);
+
+    // ── Build category tabs ──────────────────────────────────────
+    for (const cat of MAP_CATEGORIES) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.role = 'tab';
+      btn.setAttribute('aria-selected', 'false');
+      btn.dataset.cat = cat.id;
+      btn.className = 'cat-tab rounded-full px-3 py-1 text-xs font-medium transition-all whitespace-nowrap';
+      btn.style.setProperty('--cat-color', cat.color);
+      btn.innerHTML = `<span class="inline-flex items-center gap-1.5"><svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">${cat.icon}</svg>${cat.shortLabel}<span id="badge-${cat.id}" class="cat-badge hidden rounded-full bg-white/10 px-1.5 text-[9px] tabular-nums"></span></span>`;
+      dom.catNav?.appendChild(btn);
+    }
+
+    // ── Category tab switching ───────────────────────────────────
+    dom.catNav?.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest('[data-cat]') as HTMLElement | null;
+      if (!btn) return;
+      state.activeCat = btn.dataset.cat as ActiveCat;
+      dom.catNav!.querySelectorAll('.cat-tab').forEach(b => {
+        b.classList.remove('active');
+        b.setAttribute('aria-selected', 'false');
+      });
+      btn.classList.add('active');
+      btn.setAttribute('aria-selected', 'true');
+      state.tableSortKey = '';
+      state.tableSortAsc = true;
+      buildLayerToggles();
+      refreshViews();
+    });
+
+    // ── View mode switching ──────────────────────────────────────
+    document.querySelectorAll('.view-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.viewMode = (btn as HTMLElement).dataset.view as ViewMode;
+        document.querySelectorAll('.view-btn').forEach(b => {
+          b.classList.remove('active');
+          b.setAttribute('aria-checked', 'false');
+        });
+        btn.classList.add('active');
+        btn.setAttribute('aria-checked', 'true');
+        state.tableSortKey = '';
+        state.tableSortAsc = true;
+        applyViewMode();
+      });
+    });
+
+    // ── Map navigation (buttons + keyboard) ──────────────────────
+    document.getElementById('map-nav')?.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest('[data-action]') as HTMLElement | null;
+      if (btn?.dataset.action) mapNav(btn.dataset.action);
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).tagName === 'TEXTAREA') return;
+      if (state.viewMode === 'table') return;
+      const KEY_MAP: Record<string, string> = {
+        '+': 'zoom-in', '=': 'zoom-in',
+        '-': 'zoom-out', '_': 'zoom-out',
+        ArrowUp: 'pan-up', ArrowDown: 'pan-down',
+        ArrowLeft: 'pan-left', ArrowRight: 'pan-right',
+        '0': 'reset', Home: 'reset',
+      };
+      const action = KEY_MAP[e.key];
+      if (action) { e.preventDefault(); mapNav(action); }
+    });
+
+    // ── Filter controls ──────────────────────────────────────────
+    dom.applyBtn?.addEventListener('click', () => { state.explicitTimeRange = true; loadData(); });
+    dom.countryInput?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        state.explicitTimeRange = true;
+        loadData();
+      }
+    });
+    dom.loadingRetry?.addEventListener('click', () => loadData());
+
+    document.querySelectorAll<HTMLButtonElement>('.time-preset').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.explicitTimeRange = true;
+        const days = Number(btn.dataset.days);
+        if (dom.endInput) dom.endInput.value = new Date().toISOString().slice(0, 10);
+        if (dom.startInput) dom.startInput.value = days === 0 ? '1989-01-01' : defaultStartDate(days);
+        document.querySelectorAll<HTMLButtonElement>('.time-preset').forEach(b => {
+          b.className = 'time-preset rounded border border-fin-700 bg-fin-800 px-2 py-0.5 text-[10px] text-slate-400 hover:border-fin-500 hover:text-white transition-all';
+        });
+        btn.className = 'time-preset active-preset rounded border border-fin-500 bg-fin-600/20 px-2 py-0.5 text-[10px] text-fin-400 font-medium';
+        loadData();
+      });
+    });
+
+    // ── Init ─────────────────────────────────────────────────────
+    async function init() {
+      buildLayerToggles();
+      applyViewMode();
+      showLoading('Loading world map...');
+
+      try {
+        const result = await initGeoChart(dom.mapEl!);
+        charts.main = result.chart;
+        charts.mainRo = result.resizeObserver;
+        setupMapClicks();
+      } catch (err) {
+        console.error('Failed to initialize geo chart:', err);
+        showError('Failed to load world map. Check your connection and retry.');
+        return;
+      }
+
+      await loadData();
+    }
+
+    init();
+  </script>
+</DashboardLayout>

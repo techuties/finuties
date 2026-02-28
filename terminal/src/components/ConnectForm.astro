@@ -1,0 +1,46 @@
+---
+interface Props {
+  defaultBase?: string;
+}
+const { defaultBase = 'https://data.finuties.com' } = Astro.props;
+---
+
+<div id="connect-gate" class="mx-auto max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-sm" role="region" aria-labelledby="connect-heading">
+  <h2 id="connect-heading" class="text-lg font-semibold text-fin-900">Connect to FinUties API</h2>
+  <p class="mt-2 text-sm text-fin-muted">Enter your API base URL and Bearer token. They are stored in your browser only.</p>
+  <form id="connect-form" class="mt-4 space-y-4" aria-label="Connect form">
+    <div>
+      <label for="api-base" class="block text-sm font-medium text-fin-900">API Base URL</label>
+      <input
+        id="api-base"
+        name="base"
+        type="url"
+        value={defaultBase}
+        placeholder="https://data.finuties.com"
+        class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm focus:border-fin-600 focus:outline-none focus:ring-1 focus:ring-fin-600"
+        autocomplete="url"
+      />
+    </div>
+    <div>
+      <label for="api-token" class="block text-sm font-medium text-fin-900">Bearer token</label>
+      <input
+        id="api-token"
+        name="token"
+        type="password"
+        required
+        placeholder="Your API_BEARER_TOKEN or API_ADMIN_BEARER_TOKEN"
+        class="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm focus:border-fin-600 focus:outline-none focus:ring-1 focus:ring-fin-600"
+        autocomplete="off"
+      />
+    </div>
+    <div class="flex gap-3">
+      <button
+        type="submit"
+        class="rounded-lg bg-fin-600 px-4 py-2 text-sm font-medium text-white hover:bg-fin-500 transition-colors"
+      >
+        Connect
+      </button>
+    </div>
+  </form>
+  <p class="mt-4 text-xs text-fin-muted">Get tokens from your FinUties API config: <code class="rounded bg-fin-code px-1 py-0.5 font-mono">API_BEARER_TOKEN</code> (user), <code class="rounded bg-fin-code px-1 py-0.5 font-mono">API_ADMIN_BEARER_TOKEN</code> (admin).</p>
+</div>

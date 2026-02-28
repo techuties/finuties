@@ -1,0 +1,64 @@
+---
+import DashboardLayout from '../../layouts/DashboardLayout.astro';
+---
+
+<DashboardLayout
+  title="Analyze — FinUties"
+  description="Analysis workbench: load, transform, chart, and analyse FinUties API data."
+  active="analyze"
+>
+  <!-- Toolbar -->
+  <div id="wb-toolbar" class="border-b border-fin-800 bg-fin-900/80 backdrop-blur px-4 py-2 flex items-center gap-2 flex-wrap">
+    <span class="text-sm font-semibold text-slate-200 mr-2">Workbench</span>
+    <button type="button" data-add="data" class="wb-add rounded border border-blue-500/40 bg-blue-500/10 px-2 py-1 text-xs font-medium text-blue-400 hover:bg-blue-500/20">+ Data</button>
+    <button type="button" data-add="transform" class="wb-add rounded border border-purple-500/40 bg-purple-500/10 px-2 py-1 text-xs font-medium text-purple-400 hover:bg-purple-500/20">+ Transform</button>
+    <button type="button" data-add="chart" class="wb-add rounded border border-green-500/40 bg-green-500/10 px-2 py-1 text-xs font-medium text-green-400 hover:bg-green-500/20">+ Chart</button>
+    <button type="button" data-add="stats" class="wb-add rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-400 hover:bg-amber-500/20">+ Stats</button>
+    <button type="button" data-add="table" class="wb-add rounded border border-teal-500/40 bg-teal-500/10 px-2 py-1 text-xs font-medium text-teal-400 hover:bg-teal-500/20">+ Table</button>
+    <button type="button" data-add="note" class="wb-add rounded border border-slate-500/40 bg-slate-500/10 px-2 py-1 text-xs font-medium text-slate-400 hover:bg-slate-500/20">+ Note</button>
+    <div class="flex-1"></div>
+    <button type="button" id="wb-run-all" class="rounded bg-fin-600 px-3 py-1 text-xs font-medium text-white hover:bg-fin-500">Run All</button>
+    <button type="button" id="wb-new" class="rounded border border-fin-700 px-3 py-1 text-xs text-slate-400 hover:bg-fin-800">New</button>
+    <button type="button" id="wb-export-nb" class="rounded border border-fin-700 px-3 py-1 text-xs text-slate-400 hover:bg-fin-800">Export</button>
+    <div id="wb-cost" class="text-xs text-slate-500 ml-2">
+      <span id="wb-cost-calls">0 calls</span> &middot; <span id="wb-cost-credits">0 credits</span>
+    </div>
+    </div>
+
+  <!-- Main layout -->
+  <div class="flex" style="height:calc(100vh - 120px)">
+    <!-- Sidebar -->
+    <aside id="wb-sidebar" class="w-[260px] border-r border-fin-800 bg-fin-900/60 overflow-y-auto shrink-0 text-sm">
+      <div id="wb-catalog" class="p-3">
+        <h3 class="font-semibold text-slate-300 text-xs uppercase tracking-wide mb-2">Data Catalog</h3>
+        <p class="text-xs text-slate-500">Loading...</p>
+      </div>
+      <div id="wb-tables" class="p-3 border-t border-fin-800/60">
+        <h3 class="font-semibold text-slate-300 text-xs uppercase tracking-wide mb-2">Loaded Tables</h3>
+        <p class="text-xs text-slate-500" id="wb-tables-empty">No tables loaded yet.</p>
+        <div id="wb-tables-list"></div>
+        </div>
+      <div id="wb-examples" class="p-3 border-t border-fin-800/60">
+        <h3 class="font-semibold text-slate-300 text-xs uppercase tracking-wide mb-2">Examples</h3>
+        <div id="wb-examples-list"><p class="text-xs text-slate-500">Loading...</p></div>
+        </div>
+      <div id="wb-pricing" class="p-3 border-t border-fin-800/60">
+        <h3 class="font-semibold text-slate-300 text-xs uppercase tracking-wide mb-2">Cost</h3>
+        <div id="wb-pricing-info"><p class="text-xs text-slate-500">Loading...</p></div>
+              </div>
+    </aside>
+
+    <!-- Cell area -->
+    <div id="wb-cells" class="flex-1 overflow-y-auto bg-fin-950 p-4 space-y-4">
+      <div id="wb-empty" class="text-center py-16 text-slate-500">
+        <p class="text-lg font-medium text-slate-300">Analysis Workbench</p>
+        <p class="text-sm mt-2">Add cells using the toolbar above, or click a resource in the sidebar.</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    import { initWorkbench } from '../../lib/workbench/workbench-ui';
+    initWorkbench();
+  </script>
+</DashboardLayout>

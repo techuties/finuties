@@ -1,0 +1,395 @@
+---
+import DashboardLayout from '../../layouts/DashboardLayout.astro';
+---
+
+<DashboardLayout
+  title="Commodities — FinUties"
+  description="CFTC Commitment of Traders positioning data for commodities and futures."
+  active="commodities"
+>
+  <!-- Auth gate: centralized API key policy -->
+  <script>
+  import { enforceApiKeySession } from '../../lib/auth/bootstrap';
+  import { getDefaultApiBase } from '../../lib/api-client';
+
+  enforceApiKeySession({
+    defaultBase: getDefaultApiBase(),
+    redirectTo: '/?apikey=1',
+    logPrefix: 'commodities-auth',
+  });
+  </script>
+
+  <!-- Page header -->
+  <div class="border-b border-fin-800 bg-fin-900/60">
+    <div class="mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8 py-5">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 class="text-xl font-bold text-slate-200">Commodities</h1>
+          <p class="text-sm text-slate-500 mt-0.5">CFTC Commitment of Traders positioning data</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="relative">
+            <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
+            <input id="commodity-search" type="text" placeholder="Search commodities..." class="w-64 pl-9 pr-3 py-2 bg-fin-800 border border-fin-700 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-fin-500 transition-colors" />
+          </div>
+          <select id="report-select" class="bg-fin-800 border border-fin-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-fin-500">
+            <option value="legacy_futures-facts">Legacy Futures</option>
+            <option value="legacy_combined-facts">Legacy Combined</option>
+            <option value="disaggregated_futures-facts">Disaggregated Futures</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Breadcrumb for detail view -->
+  <div id="breadcrumb-bar" class="hidden border-b border-fin-800/50 bg-fin-950/50">
+    <div class="mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8 py-2 flex items-center gap-2 text-xs text-slate-500">
+      <a href="/commodities" class="hover:text-slate-300 transition-colors" id="back-to-catalog">&larr; All Commodities</a>
+      <span>/</span>
+      <span id="breadcrumb-name" class="text-slate-300"></span>
+    </div>
+  </div>
+
+  <!-- Main content area -->
+  <div class="mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8 py-6">
+    <!-- Catalog view -->
+    <div id="catalog-view">
+      <div id="catalog-loading" class="flex items-center justify-center gap-3 py-16 text-slate-400">
+        <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+        <span class="text-sm">Loading commodities...</span>
+      </div>
+      <div id="catalog-error" class="hidden rounded-xl border border-red-800/40 bg-red-900/20 px-4 py-3 text-sm text-red-400"></div>
+      <div id="catalog-grid" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3"></div>
+      <p id="catalog-count" class="hidden text-xs text-slate-600 mt-3"></p>
+    </div>
+
+    <!-- Detail view -->
+    <div id="detail-view" class="hidden space-y-4">
+      <div id="detail-kpis" class="flex flex-wrap gap-3"></div>
+      <div id="detail-chart" style="width:100%;height:320px;"></div>
+      <div id="detail-table"></div>
+    </div>
+  </div>
+
+  <script>
+    import { apiFetch } from '../../lib/api-client';
+
+    interface Commodity {
+      commodity_name: string;
+      commodity_code: string;
+      latest_report: string | null;
+      record_count: number;
+    }
+
+    interface CotRow {
+      report_date: string;
+      commodity_name: string;
+      commodity: string;
+      noncommercial_long: number;
+      noncommercial_short: number;
+      commercial_long: number;
+      commercial_short: number;
+      open_interest: number;
+      [key: string]: unknown;
+    }
+
+    const _E: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' };
+    function esc(s: string): string { return String(s ?? '').replace(/[&<>"]/g, c => _E[c]); }
+    function fmtNum(n: unknown): string { const v = Number(n); if (isNaN(v)) return '\u2014'; return v.toLocaleString('en-US'); }
+    function fmtCompact(n: unknown): string {
+      const v = Number(n); if (isNaN(v) || v === 0) return '\u2014';
+      const abs = Math.abs(v);
+      if (abs >= 1e9) return (v / 1e9).toFixed(1) + 'B';
+      if (abs >= 1e6) return (v / 1e6).toFixed(1) + 'M';
+      if (abs >= 1e3) return (v / 1e3).toFixed(1) + 'K';
+      return v.toFixed(0);
+    }
+
+    // DOM refs
+    const searchInput = document.getElementById('commodity-search') as HTMLInputElement;
+    const reportSelect = document.getElementById('report-select') as HTMLSelectElement;
+    const catalogView = document.getElementById('catalog-view')!;
+    const catalogLoading = document.getElementById('catalog-loading')!;
+    const catalogError = document.getElementById('catalog-error')!;
+    const catalogGrid = document.getElementById('catalog-grid')!;
+    const catalogCount = document.getElementById('catalog-count')!;
+    const detailView = document.getElementById('detail-view')!;
+    const detailKpis = document.getElementById('detail-kpis')!;
+    const detailChart = document.getElementById('detail-chart')!;
+    const detailTable = document.getElementById('detail-table')!;
+    const breadcrumbBar = document.getElementById('breadcrumb-bar')!;
+    const breadcrumbName = document.getElementById('breadcrumb-name')!;
+
+    let allCommodities: Commodity[] = [];
+    let chartInstance: { dispose: () => void; resize: () => void; setOption: (o: unknown) => void } | null = null;
+    const resizeHandler = () => chartInstance?.resize();
+
+    // ─── Catalog ──────────────────────────────────────────────────
+
+    async function loadCatalog(): Promise<void> {
+      catalogLoading.style.display = '';
+      catalogError.classList.add('hidden');
+      catalogGrid.classList.add('hidden');
+
+      try {
+        const res = await apiFetch<{ items: Commodity[]; total: number }>('/api/v1/cftc/commodities');
+        if (!res.ok || !res.data?.items) throw new Error(res.error || 'Failed to load');
+        allCommodities = res.data.items;
+        renderCatalog(allCommodities);
+      } catch (err) {
+        catalogError.textContent = 'Failed to load commodities: ' + (err instanceof Error ? err.message : 'Unknown error');
+        catalogError.classList.remove('hidden');
+      } finally {
+        catalogLoading.style.display = 'none';
+      }
+    }
+
+    function renderCatalog(commodities: Commodity[]): void {
+      catalogGrid.innerHTML = '';
+      catalogGrid.classList.remove('hidden');
+      catalogCount.classList.remove('hidden');
+      catalogCount.textContent = `${commodities.length} commodit${commodities.length === 1 ? 'y' : 'ies'} found`;
+
+      if (commodities.length === 0) {
+        catalogGrid.innerHTML = '<p class="col-span-full text-center text-slate-500 py-8">No commodities match your search.</p>';
+        return;
+      }
+
+      for (const c of commodities) {
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = 'text-left rounded-xl border border-fin-800 bg-fin-900/80 p-4 hover:border-fin-600 hover:bg-fin-800/60 transition-all group';
+        card.dataset.commodity = c.commodity_name;
+
+        const latestDate = c.latest_report ? c.latest_report.slice(0, 10) : 'N/A';
+
+        card.innerHTML = `
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <h3 class="text-sm font-semibold text-slate-200 group-hover:text-white truncate">${esc(c.commodity_name)}</h3>
+              <p class="text-[10px] text-slate-500 mt-0.5">${esc(c.commodity_code || '')}</p>
+            </div>
+            <svg class="w-4 h-4 text-slate-600 group-hover:text-fin-400 flex-shrink-0 mt-0.5 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
+          </div>
+          <div class="flex items-center gap-3 mt-3 text-[10px] text-slate-500">
+            <span>${fmtNum(c.record_count)} reports</span>
+            <span>Latest: ${esc(latestDate)}</span>
+          </div>
+        `;
+
+        card.addEventListener('click', () => showDetail(c.commodity_name));
+        catalogGrid.appendChild(card);
+      }
+    }
+
+    // ─── Search filter ────────────────────────────────────────────
+
+    searchInput.addEventListener('input', () => {
+      const q = searchInput.value.trim().toLowerCase();
+      if (!q) { renderCatalog(allCommodities); return; }
+      const filtered = allCommodities.filter(c =>
+        c.commodity_name.toLowerCase().includes(q) ||
+        (c.commodity_code && c.commodity_code.toLowerCase().includes(q))
+      );
+      renderCatalog(filtered);
+    });
+
+    // ─── Detail view ──────────────────────────────────────────────
+
+    async function showDetail(commodityName: string): Promise<void> {
+      catalogView.classList.add('hidden');
+      detailView.classList.remove('hidden');
+      breadcrumbBar.classList.remove('hidden');
+      breadcrumbName.textContent = commodityName;
+
+      // Update URL
+      const url = new URL(window.location.href);
+      url.searchParams.set('commodity', commodityName);
+      history.pushState({}, '', url.toString());
+
+      detailKpis.innerHTML = '';
+      detailChart.innerHTML = '<div class="flex items-center justify-center h-full text-slate-500 text-sm"><svg class="animate-spin h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>Loading...</div>';
+      detailTable.innerHTML = '';
+
+      const report = reportSelect.value;
+      try {
+        const res = await apiFetch<CotRow[]>(`/api/v1/cftc/${report}?commodity_name=${encodeURIComponent(commodityName)}&limit=200`);
+        if (!res.ok || !res.data) throw new Error(res.error || 'Failed to load');
+        const rows: CotRow[] = Array.isArray(res.data) ? res.data : (res.data as { items?: CotRow[] }).items ?? [];
+
+        if (rows.length === 0) {
+          detailChart.innerHTML = '<p class="text-center text-slate-500 py-8">No data found for this commodity.</p>';
+          return;
+        }
+
+        const sorted = [...rows].sort((a, b) => String(a.report_date).localeCompare(String(b.report_date)));
+        const latest = sorted[sorted.length - 1];
+
+        // KPIs
+        const ncLong = Number(latest.noncommercial_long ?? 0);
+        const ncShort = Number(latest.noncommercial_short ?? 0);
+        const cLong = Number(latest.commercial_long ?? 0);
+        const cShort = Number(latest.commercial_short ?? 0);
+        const netNc = ncLong - ncShort;
+        const netC = cLong - cShort;
+        const oi = Number(latest.open_interest ?? 0);
+
+        const kpis = [
+          { label: 'Net Non-Commercial', value: fmtCompact(netNc), color: netNc >= 0 ? 'text-emerald-400' : 'text-red-400' },
+          { label: 'Net Commercial', value: fmtCompact(netC), color: netC >= 0 ? 'text-emerald-400' : 'text-red-400' },
+          { label: 'NC Long', value: fmtCompact(ncLong), color: 'text-emerald-400' },
+          { label: 'NC Short', value: fmtCompact(ncShort), color: 'text-red-400' },
+          { label: 'Open Interest', value: fmtCompact(oi), color: 'text-slate-200' },
+          { label: 'Latest Report', value: String(latest.report_date ?? '').slice(0, 10), color: 'text-slate-200' },
+          { label: 'Reports', value: String(rows.length), color: 'text-slate-200' },
+        ];
+        detailKpis.innerHTML = kpis.map(k =>
+          `<div class="bg-fin-800/60 border border-fin-700/40 rounded-lg px-4 py-2.5 min-w-[120px]">` +
+          `<p class="text-[10px] text-slate-500 uppercase">${esc(k.label)}</p>` +
+          `<p class="text-sm font-bold ${k.color}">${esc(k.value)}</p></div>`
+        ).join('');
+
+        // Chart
+        renderPositioningChart(sorted);
+
+        // Table
+        renderPositioningTable(rows);
+      } catch (err) {
+        detailChart.innerHTML = `<p class="text-center text-red-400 py-8">Error: ${esc(err instanceof Error ? err.message : 'Unknown')}</p>`;
+      }
+    }
+
+    function renderPositioningChart(sorted: CotRow[]): void {
+      import('echarts').then(echarts => {
+        if (chartInstance) { chartInstance.dispose(); window.removeEventListener('resize', resizeHandler); }
+        detailChart.innerHTML = '';
+        chartInstance = echarts.init(detailChart);
+
+        const dates = sorted.map(r => String(r.report_date).slice(0, 10));
+        const ncLong = sorted.map(r => Number(r.noncommercial_long ?? 0));
+        const ncShort = sorted.map(r => -(Number(r.noncommercial_short ?? 0)));
+        const cLong = sorted.map(r => Number(r.commercial_long ?? 0));
+        const cShort = sorted.map(r => -(Number(r.commercial_short ?? 0)));
+        const oi = sorted.map(r => Number(r.open_interest ?? 0));
+
+        chartInstance!.setOption({
+          backgroundColor: 'transparent',
+          tooltip: {
+            trigger: 'axis',
+            axisPointer: { type: 'shadow' },
+            formatter: (params: { seriesName: string; value: number; axisValue: string }[]) => {
+              if (!Array.isArray(params) || params.length === 0) return '';
+              let html = `<div style="font-size:11px"><strong>${esc(params[0].axisValue)}</strong>`;
+              for (const p of params) { html += `<br/>${esc(p.seriesName)}: ${Math.abs(p.value).toLocaleString()}`; }
+              return html + '</div>';
+            },
+          },
+          legend: { top: 0, textStyle: { color: '#94a3b8', fontSize: 10 } },
+          grid: { left: 65, right: 65, top: 40, bottom: 30 },
+          xAxis: { type: 'category', data: dates, axisLabel: { color: '#64748b', fontSize: 9, rotate: dates.length > 30 ? 45 : 0 } },
+          yAxis: [
+            {
+              type: 'value', name: 'Positions',
+              axisLabel: { color: '#64748b', fontSize: 9, formatter: (v: number) => { const a = Math.abs(v); return a >= 1e6 ? (v/1e6).toFixed(1)+'M' : a >= 1e3 ? (v/1e3).toFixed(0)+'K' : String(v); } },
+              splitLine: { lineStyle: { color: '#1e293b' } },
+            },
+            {
+              type: 'value', name: 'Open Interest',
+              axisLabel: { color: '#64748b', fontSize: 9, formatter: (v: number) => { const a = Math.abs(v); return a >= 1e6 ? (v/1e6).toFixed(1)+'M' : a >= 1e3 ? (v/1e3).toFixed(0)+'K' : String(v); } },
+              splitLine: { show: false },
+            },
+          ],
+          series: [
+            { name: 'Non-Comm Long', type: 'bar', stack: 'long', data: ncLong, itemStyle: { color: '#22c55e' } },
+            { name: 'Comm Long', type: 'bar', stack: 'long', data: cLong, itemStyle: { color: '#3b82f6' } },
+            { name: 'Non-Comm Short', type: 'bar', stack: 'short', data: ncShort, itemStyle: { color: '#ef4444' } },
+            { name: 'Comm Short', type: 'bar', stack: 'short', data: cShort, itemStyle: { color: '#f97316' } },
+            { name: 'Open Interest', type: 'line', yAxisIndex: 1, data: oi, lineStyle: { width: 1.5, color: '#a855f7' }, itemStyle: { color: '#a855f7' }, symbol: 'none' },
+          ],
+        });
+
+        window.addEventListener('resize', resizeHandler);
+      }).catch(() => {
+        detailChart.innerHTML = '<p class="text-center text-slate-500 py-8">Failed to load chart.</p>';
+      });
+    }
+
+    function renderPositioningTable(rows: CotRow[]): void {
+      const sortedDesc = [...rows].sort((a, b) => String(b.report_date).localeCompare(String(a.report_date)));
+      const display = sortedDesc.slice(0, 60);
+
+      const cols = [
+        { key: 'report_date', label: 'Date', align: 'left' },
+        { key: 'noncommercial_long', label: 'NC Long', align: 'right' },
+        { key: 'noncommercial_short', label: 'NC Short', align: 'right' },
+        { key: 'commercial_long', label: 'C Long', align: 'right' },
+        { key: 'commercial_short', label: 'C Short', align: 'right' },
+        { key: 'open_interest', label: 'Open Interest', align: 'right' },
+      ];
+
+      let html = '<div class="overflow-x-auto"><table class="w-full text-left text-xs">';
+      html += '<thead><tr class="border-b border-fin-800">';
+      for (const c of cols) html += `<th class="px-2 py-1.5 text-[10px] text-slate-500 font-medium uppercase ${c.align === 'right' ? 'text-right' : ''}">${esc(c.label)}</th>`;
+      html += '</tr></thead><tbody>';
+
+      for (const row of display) {
+        html += '<tr class="border-b border-fin-800/40 hover:bg-fin-800/30">';
+        for (const c of cols) {
+          const val = (row as Record<string, unknown>)[c.key];
+          const isNum = c.align === 'right';
+          const cls = isNum ? 'text-right font-mono text-slate-300' : 'text-slate-400';
+          const formatted = isNum ? fmtNum(val) : (val == null ? '\u2014' : String(val).slice(0, 10));
+          html += `<td class="px-2 py-1.5 ${cls}">${esc(formatted)}</td>`;
+        }
+        html += '</tr>';
+      }
+      html += '</tbody></table></div>';
+      if (rows.length > 60) html += `<p class="text-[10px] text-slate-600 text-center mt-2">${rows.length} total rows (${rows.length - 60} more)</p>`;
+      detailTable.innerHTML = html;
+    }
+
+    // ─── Back to catalog ──────────────────────────────────────────
+
+    function showCatalog(): void {
+      detailView.classList.add('hidden');
+      catalogView.classList.remove('hidden');
+      breadcrumbBar.classList.add('hidden');
+      if (chartInstance) { chartInstance.dispose(); chartInstance = null; window.removeEventListener('resize', resizeHandler); }
+      const url = new URL(window.location.href);
+      url.searchParams.delete('commodity');
+      history.pushState({}, '', url.toString());
+    }
+
+    document.getElementById('back-to-catalog')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      showCatalog();
+    });
+
+    // Handle browser back/forward
+    window.addEventListener('popstate', () => {
+      const url = new URL(window.location.href);
+      const commodity = url.searchParams.get('commodity');
+      if (commodity) showDetail(commodity);
+      else showCatalog();
+    });
+
+    // Report type change reloads the detail if active
+    reportSelect.addEventListener('change', () => {
+      const url = new URL(window.location.href);
+      const commodity = url.searchParams.get('commodity');
+      if (commodity) showDetail(commodity);
+    });
+
+    // ─── Init ─────────────────────────────────────────────────────
+
+    async function init(): Promise<void> {
+      await loadCatalog();
+      const url = new URL(window.location.href);
+      const commodity = url.searchParams.get('commodity');
+      if (commodity) showDetail(commodity);
+    }
+
+    init();
+  </script>
+</DashboardLayout>

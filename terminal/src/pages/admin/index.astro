@@ -1,0 +1,609 @@
+---
+import DashboardLayout from '../../layouts/DashboardLayout.astro';
+import ConnectForm from '../../components/ConnectForm.astro';
+
+const defaultBase = import.meta.env.PUBLIC_API_ORIGIN || 'https://data.finuties.com';
+---
+
+<DashboardLayout
+  title="Admin — FinUties"
+  description="FinUties admin dashboard: ingestion status, parse health, pipeline status, and data-collection actions."
+>
+  <div class="mx-auto max-w-[1200px] px-4 py-8 sm:px-6 lg:px-8">
+    <div id="connect-gate-wrapper" class="hidden">
+      <ConnectForm defaultBase={defaultBase} />
+    </div>
+
+    <div id="admin-content" class="hidden space-y-8">
+      <div id="network-error-banner" class="hidden rounded-xl border border-amber-200 bg-amber-50 p-4">
+        <p class="text-fin-900">Cannot reach the API. Verify the endpoint is <code class="rounded bg-fin-code px-1 py-0.5 font-mono">https://data.finuties.com</code>.</p>
+        <a href="/disconnect" class="mt-2 inline-block text-sm text-fin-600 hover:underline">Disconnect</a>
+      </div>
+      <section>
+        <h1 class="text-2xl font-semibold text-fin-900">Admin</h1>
+        <p class="mt-1 text-fin-muted">Ingestion status, parse health, pipeline status, and data-collection triggers.</p>
+      </section>
+
+      <div id="admin-forbidden" class="hidden rounded-xl border border-amber-200 bg-amber-50 p-6">
+        <p class="font-medium text-fin-900">Admin access required</p>
+        <p class="mt-2 text-sm text-fin-muted">Use an <code class="rounded bg-fin-code px-1 py-0.5 font-mono">API_ADMIN_BEARER_TOKEN</code> to view this page.</p>
+        <div class="mt-4 flex flex-wrap gap-4">
+          <a href="/dashboard" class="text-sm text-fin-600 hover:underline">← Dashboard</a>
+          <button type="button" id="admin-forbidden-clear" class="text-sm text-fin-600 hover:underline">Clear and reconnect</button>
+        </div>
+      </div>
+
+      <!-- Pipeline Statistics Section -->
+      <section id="pipeline-stats-section" class="space-y-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-xl font-semibold text-fin-900">Pipeline Statistics</h2>
+            <p class="mt-1 text-sm text-fin-muted">Comprehensive data gathering insights: sources, endpoints, volume, performance, and historical coverage.</p>
+          </div>
+          <div class="flex gap-2">
+            <select id="stats-days" class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm">
+              <option value="7">Last 7 days</option>
+              <option value="30" selected>Last 30 days</option>
+              <option value="90">Last 90 days</option>
+              <option value="180">Last 180 days</option>
+              <option value="365">Last year</option>
+            </select>
+            <select id="stats-granularity" class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm">
+              <option value="hour">Hourly</option>
+              <option value="day" selected>Daily</option>
+              <option value="week">Weekly</option>
+              <option value="month">Monthly</option>
+            </select>
+            <button id="stats-refresh" class="rounded-lg border border-slate-300 bg-white px-4 py-1.5 text-sm font-medium text-fin-900 hover:bg-slate-50">
+              Refresh
+            </button>
+          </div>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div class="text-sm text-fin-muted">Total Runs</div>
+            <div id="stat-total-runs" class="mt-1 text-2xl font-semibold text-fin-900">-</div>
+          </div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div class="text-sm text-fin-muted">Success Rate</div>
+            <div id="stat-success-rate" class="mt-1 text-2xl font-semibold text-fin-900">-</div>
+          </div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div class="text-sm text-fin-muted">Records Collected</div>
+            <div id="stat-total-records" class="mt-1 text-2xl font-semibold text-fin-900">-</div>
+          </div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div class="text-sm text-fin-muted">Unique Sources</div>
+            <div id="stat-unique-sources" class="mt-1 text-2xl font-semibold text-fin-900">-</div>
+          </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="grid gap-6 lg:grid-cols-2">
+          <div class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h3 class="font-semibold text-fin-900">Historical Coverage</h3>
+            <div id="chart-historical" class="mt-4 h-64"></div>
+          </div>
+          <div class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h3 class="font-semibold text-fin-900">Records by Category</h3>
+            <div id="chart-category" class="mt-4 h-64"></div>
+          </div>
+        </div>
+
+        <!-- Source Breakdown -->
+        <div class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h3 class="font-semibold text-fin-900">Source Statistics</h3>
+          <div class="mt-4 overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200">
+              <thead class="bg-slate-50">
+                <tr>
+                  <th class="px-4 py-3 text-left text-xs font-medium uppercase text-slate-700">Source</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium uppercase text-slate-700">Category</th>
+                  <th class="px-4 py-3 text-right text-xs font-medium uppercase text-slate-700">Runs</th>
+                  <th class="px-4 py-3 text-right text-xs font-medium uppercase text-slate-700">Success Rate</th>
+                  <th class="px-4 py-3 text-right text-xs font-medium uppercase text-slate-700">Records</th>
+                  <th class="px-4 py-3 text-right text-xs font-medium uppercase text-slate-700">Avg/Run</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium uppercase text-slate-700">Last Collection</th>
+                </tr>
+              </thead>
+              <tbody id="source-stats-body" class="divide-y divide-slate-200 bg-white">
+                <tr><td colspan="7" class="px-4 py-8 text-center text-sm text-fin-muted">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Endpoint Statistics -->
+        <div class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h3 class="font-semibold text-fin-900">Endpoint Statistics</h3>
+          <div class="mt-4 overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200">
+              <thead class="bg-slate-50">
+                <tr>
+                  <th class="px-4 py-3 text-left text-xs font-medium uppercase text-slate-700">Endpoint</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium uppercase text-slate-700">Method</th>
+                  <th class="px-4 py-3 text-right text-xs font-medium uppercase text-slate-700">Runs</th>
+                  <th class="px-4 py-3 text-right text-xs font-medium uppercase text-slate-700">Success Rate</th>
+                  <th class="px-4 py-3 text-right text-xs font-medium uppercase text-slate-700">Records</th>
+                  <th class="px-4 py-3 text-right text-xs font-medium uppercase text-slate-700">Active Days</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium uppercase text-slate-700">Last Run</th>
+                </tr>
+              </thead>
+              <tbody id="endpoint-stats-body" class="divide-y divide-slate-200 bg-white">
+                <tr><td colspan="7" class="px-4 py-8 text-center text-sm text-fin-muted">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Error Analysis -->
+        <div class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h3 class="font-semibold text-fin-900">Error Analysis</h3>
+          <div class="mt-4 overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200">
+              <thead class="bg-slate-50">
+                <tr>
+                  <th class="px-4 py-3 text-left text-xs font-medium uppercase text-slate-700">Source</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium uppercase text-slate-700">Error</th>
+                  <th class="px-4 py-3 text-right text-xs font-medium uppercase text-slate-700">Count</th>
+                  <th class="px-4 py-3 text-right text-xs font-medium uppercase text-slate-700">Affected Records</th>
+                </tr>
+              </thead>
+              <tbody id="error-analysis-body" class="divide-y divide-slate-200 bg-white">
+                <tr><td colspan="4" class="px-4 py-8 text-center text-sm text-fin-muted">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Legacy Status Cards -->
+      <div id="admin-cards" class="grid gap-6 sm:grid-cols-2">
+        <div id="card-ingestion" class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 class="font-semibold text-fin-900">Ingestion status</h2>
+          <div id="card-ingestion-body" class="mt-3 text-sm text-fin-muted">Loading…</div>
+        </div>
+        <div id="card-parse-health" class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 class="font-semibold text-fin-900">Parse health</h2>
+          <div id="card-parse-health-body" class="mt-3 text-sm text-fin-muted">Loading…</div>
+        </div>
+        <div id="card-parse-failures" class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 class="font-semibold text-fin-900">Parse failures</h2>
+          <div id="card-parse-failures-body" class="mt-3 text-sm text-fin-muted">Loading…</div>
+        </div>
+        <div id="card-sec-status" class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 class="font-semibold text-fin-900">SEC endpoint status</h2>
+          <div id="card-sec-status-body" class="mt-3 text-sm text-fin-muted">Loading…</div>
+        </div>
+        <div id="card-ecb" class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 class="font-semibold text-fin-900">ECB status</h2>
+          <div id="card-ecb-body" class="mt-3 text-sm text-fin-muted">Loading…</div>
+        </div>
+        <div id="card-cftc" class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 class="font-semibold text-fin-900">CFTC endpoints</h2>
+          <div id="card-cftc-body" class="mt-3 text-sm text-fin-muted">Loading…</div>
+        </div>
+        <div id="card-api-limits" class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:col-span-2">
+          <h2 class="font-semibold text-fin-900">API limits</h2>
+          <div id="card-api-limits-body" class="mt-3 text-sm text-fin-muted">Loading…</div>
+        </div>
+      </div>
+
+      <div id="admin-actions" class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 class="font-semibold text-fin-900">Actions</h2>
+        <p class="mt-1 text-sm text-fin-muted">Trigger data-collection. Requires admin token. Use with care.</p>
+        <div class="mt-4 flex flex-wrap gap-3">
+          <button type="button" id="action-sec-rss-sync" class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-fin-900 hover:bg-slate-50">
+            SEC RSS sync
+          </button>
+          <a id="admin-docs-link" href="/docs" class="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-fin-900 hover:bg-slate-50">Open /docs for more</a>
+        </div>
+        <p id="action-feedback" class="mt-3 text-sm text-fin-muted hidden"></p>
+      </div>
+    </div>
+
+    <div id="dashboard-error" class="hidden mx-auto max-w-md rounded-xl border border-amber-200 bg-amber-50 p-6">
+      <p id="dashboard-error-msg" class="text-fin-900"></p>
+      <button id="dashboard-error-clear" type="button" class="mt-4 text-sm text-fin-600 hover:underline">Clear and reconnect</button>
+    </div>
+  </div>
+
+  <script>
+    import { getApiConfig, setApiConfig, clearApiConfig, apiFetch, isNetworkError } from '../../lib/api-client';
+
+    function show(id: string) { document.getElementById(id)?.classList.remove('hidden'); }
+    function hide(id: string) { document.getElementById(id)?.classList.add('hidden'); }
+    function el(id: string): HTMLElement | null { return document.getElementById(id); }
+
+    function esc(s: string): string {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    function renderJson(id: string, data: unknown, err?: string) {
+      const b = el(id);
+      if (!b) return;
+      if (err) { b.innerHTML = `<p class="text-amber-700">${esc(err)}</p>`; return; }
+      b.innerHTML = '<pre class="overflow-x-auto max-h-48 text-xs">' + esc(JSON.stringify(data, null, 2).slice(0, 2000)) + '</pre>';
+    }
+
+    function wireConnectForm() {
+      const form = el('connect-form');
+      if (!form) return;
+      form.addEventListener('submit', (e: Event) => {
+        e.preventDefault();
+        const f = e.target as HTMLFormElement;
+        // Auto-detect API URL: use current origin if available, otherwise fallback
+        const currentOrigin = typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.host}` : '';
+        const inputEl = f.querySelector('[name="base"]') as HTMLInputElement;
+        const fallbackBase = currentOrigin || inputEl?.placeholder || defaultBase || 'https://data.finuties.com';
+        const base = inputEl?.value?.trim() || fallbackBase;
+        const token = (f.querySelector('[name="token"]') as HTMLInputElement)?.value?.trim() || '';
+        if (!token) return;
+        setApiConfig(base, token);
+        window.location.reload();
+      });
+    }
+
+    (async function () {
+      const config = getApiConfig();
+      if (!config) {
+        show('connect-gate-wrapper');
+        wireConnectForm();
+        return;
+      }
+
+      el('dashboard-error-clear')?.addEventListener('click', () => { clearApiConfig(); window.location.reload(); });
+
+      const meR = await apiFetch<{ role?: string }>('/api/v1/auth/me');
+      if (!meR.ok && meR.status === 401) {
+        hide('admin-content');
+        show('dashboard-error');
+        const em = el('dashboard-error-msg');
+        if (em) em.textContent = 'Invalid or expired token. Clear and enter a new Bearer token.';
+        return;
+      }
+      if (isNetworkError(meR)) {
+        show('admin-content');
+        show('network-error-banner');
+      } else if (meR.data?.role !== 'admin') {
+        show('admin-content');
+        show('admin-forbidden');
+        hide('admin-cards');
+        hide('admin-actions');
+        el('admin-forbidden-clear')?.addEventListener('click', () => { clearApiConfig(); window.location.reload(); });
+        wireConnectForm();
+        return;
+      } else {
+        show('admin-content');
+        hide('admin-forbidden');
+        show('pipeline-stats-section');
+      }
+
+      const base = (getApiConfig()?.base || '').replace(/\/$/, '');
+      const docsLink = el('admin-docs-link');
+      if (docsLink) docsLink.setAttribute('href', base ? `${base}/docs` : '/docs');
+
+      // Load pipeline statistics
+      async function loadPipelineStats() {
+        const days = parseInt(el('stats-days')?.value || '30', 10);
+        const granularity = el('stats-granularity')?.value || 'day';
+        const statsR = await apiFetch(`/api/v1/data-collection/pipeline-statistics?days=${days}&granularity=${granularity}`);
+        
+        if (isNetworkError(statsR)) {
+          show('network-error-banner');
+          return;
+        }
+        
+        if (!statsR.ok || !statsR.data) {
+          console.error('Failed to load pipeline statistics:', statsR.error);
+          return;
+        }
+        
+        const stats = statsR.data;
+        
+        // Update summary cards
+        const formatNumber = (n: number) => n.toLocaleString();
+        const formatPercent = (n: number) => `${n.toFixed(1)}%`;
+        
+        const totalRunsEl = el('stat-total-runs');
+        if (totalRunsEl) totalRunsEl.textContent = formatNumber(stats.summary?.total_runs || 0);
+        
+        const successRateEl = el('stat-success-rate');
+        if (successRateEl) {
+          successRateEl.textContent = formatPercent(stats.summary?.success_rate || 0);
+          successRateEl.className = `mt-1 text-2xl font-semibold ${
+            (stats.summary?.success_rate || 0) >= 95 ? 'text-green-600' :
+            (stats.summary?.success_rate || 0) >= 80 ? 'text-yellow-600' : 'text-red-600'
+          }`;
+        }
+        
+        const totalRecordsEl = el('stat-total-records');
+        if (totalRecordsEl) totalRecordsEl.textContent = formatNumber(stats.summary?.total_records_collected || 0);
+        
+        const uniqueSourcesEl = el('stat-unique-sources');
+        if (uniqueSourcesEl) uniqueSourcesEl.textContent = formatNumber(stats.summary?.unique_sources || 0);
+        
+        // Render source statistics table
+        const sourceBody = el('source-stats-body');
+        if (sourceBody && stats.by_source) {
+          if (stats.by_source.length === 0) {
+            sourceBody.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-sm text-fin-muted">No data available</td></tr>';
+          } else {
+            sourceBody.innerHTML = stats.by_source.map((s: any) => {
+              const successRate = s.success_rate ?? 0;
+              const lastCol = s.last_collection ? (() => {
+                try {
+                  return new Date(s.last_collection).toLocaleString();
+                } catch {
+                  return s.last_collection;
+                }
+              })() : '-';
+              
+              return `
+              <tr class="hover:bg-slate-50">
+                <td class="px-4 py-3 text-sm text-fin-900">${esc(s.detail || s.source_type || 'unknown')}</td>
+                <td class="px-4 py-3 text-sm text-fin-muted">${esc(s.category || 'Unknown')}</td>
+                <td class="px-4 py-3 text-sm text-right text-fin-900">${formatNumber(s.total_runs)}</td>
+                <td class="px-4 py-3 text-sm text-right ${successRate >= 95 ? 'text-green-600' : successRate >= 80 ? 'text-yellow-600' : 'text-red-600'}">${formatPercent(successRate)}</td>
+                <td class="px-4 py-3 text-sm text-right text-fin-900">${formatNumber(s.total_records)}</td>
+                <td class="px-4 py-3 text-sm text-right text-fin-muted">${formatNumber(s.avg_records_per_run)}</td>
+                <td class="px-4 py-3 text-sm text-fin-muted">${lastCol}</td>
+              </tr>
+            `;
+            }).join('');
+          }
+        }
+        
+        // Render endpoint statistics table
+        const endpointBody = el('endpoint-stats-body');
+        if (endpointBody && stats.by_endpoint) {
+          if (stats.by_endpoint.length === 0) {
+            endpointBody.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-sm text-fin-muted">No data available</td></tr>';
+          } else {
+            endpointBody.innerHTML = stats.by_endpoint.slice(0, 20).map((e: any) => `
+              <tr class="hover:bg-slate-50">
+                <td class="px-4 py-3 text-sm text-fin-900">${esc(e.endpoint)}</td>
+                <td class="px-4 py-3 text-sm text-fin-muted">${esc(e.method)}</td>
+                <td class="px-4 py-3 text-sm text-right text-fin-900">${formatNumber(e.total_runs)}</td>
+                <td class="px-4 py-3 text-sm text-right ${e.success_rate >= 95 ? 'text-green-600' : e.success_rate >= 80 ? 'text-yellow-600' : 'text-red-600'}">${formatPercent(e.success_rate)}</td>
+                <td class="px-4 py-3 text-sm text-right text-fin-900">${formatNumber(e.total_records)}</td>
+                <td class="px-4 py-3 text-sm text-right text-fin-muted">${e.active_days}</td>
+                <td class="px-4 py-3 text-sm text-fin-muted">${e.last_seen ? new Date(e.last_seen).toLocaleString() : '-'}</td>
+              </tr>
+            `).join('');
+          }
+        }
+        
+        // Render error analysis table
+        const errorBody = el('error-analysis-body');
+        if (errorBody && stats.error_analysis) {
+          if (stats.error_analysis.length === 0) {
+            errorBody.innerHTML = '<tr><td colspan="4" class="px-4 py-8 text-center text-sm text-green-600">No errors found</td></tr>';
+          } else {
+            errorBody.innerHTML = stats.error_analysis.map((err: any) => `
+              <tr class="hover:bg-slate-50">
+                <td class="px-4 py-3 text-sm text-fin-900">${esc(err.source_type || 'unknown')}</td>
+                <td class="px-4 py-3 text-sm text-fin-muted"><code class="text-xs">${esc(err.error || 'Unknown error')}</code></td>
+                <td class="px-4 py-3 text-sm text-right text-red-600">${formatNumber(err.count)}</td>
+                <td class="px-4 py-3 text-sm text-right text-fin-muted">${formatNumber(err.affected_records)}</td>
+              </tr>
+            `).join('');
+          }
+        }
+        
+        // Render charts using ECharts (imported from package)
+        // Store chart instances for cleanup
+        let chartInstances: any[] = [];
+        
+        async function renderCharts() {
+          // Cleanup previous chart instances
+          chartInstances.forEach((chart) => {
+            try {
+              chart.dispose();
+            } catch (e) {
+              // Ignore disposal errors
+            }
+          });
+          chartInstances = [];
+          
+          try {
+            // Import ECharts dynamically
+            const echartsModule = await import('echarts');
+            const echartsLib = echartsModule.default || echartsModule;
+            
+            if (!echartsLib) {
+              console.warn('ECharts not available');
+              return;
+            }
+            
+            // Historical coverage chart
+            const historicalEl = el('chart-historical');
+            if (historicalEl && stats.historical_coverage && stats.historical_coverage.length > 0) {
+              // Clear any existing content
+              historicalEl.innerHTML = '';
+              
+              const historicalChart = echartsLib.init(historicalEl);
+              chartInstances.push(historicalChart);
+              
+              historicalChart.setOption({
+                tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+                legend: { data: ['Records', 'Success Rate'] },
+                xAxis: { 
+                  type: 'category', 
+                  data: stats.historical_coverage.map((h: any) => h.period || ''),
+                  axisLabel: { rotate: 45, interval: 0 }
+                },
+                yAxis: [
+                  { type: 'value', name: 'Records', position: 'left' },
+                  { type: 'value', name: 'Success Rate %', position: 'right', min: 0, max: 100 }
+                ],
+                series: [
+                  { 
+                    name: 'Records', 
+                    type: 'bar', 
+                    data: stats.historical_coverage.map((h: any) => h.total_records || 0),
+                    itemStyle: { color: '#3b82f6' }
+                  },
+                  { 
+                    name: 'Success Rate', 
+                    type: 'line', 
+                    yAxisIndex: 1, 
+                    data: stats.historical_coverage.map((h: any) => h.success_rate || 0),
+                    itemStyle: { color: '#10b981' },
+                    lineStyle: { width: 2 }
+                  },
+                ],
+                grid: { left: '3%', right: '4%', bottom: '15%', top: '15%', containLabel: true },
+              });
+              
+              // Handle window resize (debounced) - store handler for cleanup
+              let resizeTimer: number | null = null;
+              const resizeHandler = () => {
+                if (resizeTimer) clearTimeout(resizeTimer);
+                resizeTimer = window.setTimeout(() => {
+                  try {
+                    if (historicalChart && !historicalChart.isDisposed()) {
+                      historicalChart.resize();
+                    }
+                  } catch (e) {
+                    // Ignore resize errors (chart may be disposed)
+                  }
+                }, 100);
+              };
+              window.addEventListener('resize', resizeHandler);
+            }
+            
+            // Category breakdown chart
+            const categoryEl = el('chart-category');
+            if (categoryEl && stats.by_category) {
+              const categories = Object.keys(stats.by_category);
+              if (categories.length > 0) {
+                // Clear any existing content
+                categoryEl.innerHTML = '';
+                
+                const categoryChart = echartsLib.init(categoryEl);
+                chartInstances.push(categoryChart);
+                
+                categoryChart.setOption({
+                  tooltip: { 
+                    trigger: 'item',
+                    formatter: '{b}: {c} ({d}%)'
+                  },
+                  legend: { 
+                    orient: 'vertical', 
+                    left: 'left',
+                    top: 'middle'
+                  },
+                  series: [{
+                    name: 'Records by Category',
+                    type: 'pie',
+                    radius: ['40%', '70%'],
+                    avoidLabelOverlap: false,
+                    itemStyle: {
+                      borderRadius: 10,
+                      borderColor: '#fff',
+                      borderWidth: 2
+                    },
+                    label: {
+                      show: true,
+                      formatter: '{b}\n{d}%'
+                    },
+                    emphasis: {
+                      label: {
+                        show: true,
+                        fontSize: 14,
+                        fontWeight: 'bold'
+                      }
+                    },
+                    data: categories.map((cat: string) => ({
+                      value: stats.by_category[cat]?.total_records || 0,
+                      name: cat || 'Unknown',
+                    })),
+                  }],
+                });
+                
+                // Handle window resize (debounced) - store handler for cleanup
+                let resizeTimer: number | null = null;
+                const resizeHandler = () => {
+                  if (resizeTimer) clearTimeout(resizeTimer);
+                  resizeTimer = window.setTimeout(() => {
+                    try {
+                      if (categoryChart && !categoryChart.isDisposed()) {
+                        categoryChart.resize();
+                      }
+                    } catch (e) {
+                      // Ignore resize errors
+                    }
+                  }, 100);
+                };
+                window.addEventListener('resize', resizeHandler);
+                // Store handler reference for potential cleanup (though window listeners persist)
+              }
+            }
+          } catch (e) {
+            console.warn('Charts rendering error:', e);
+            // Fallback: show text summary
+            const historicalEl = el('chart-historical');
+            if (historicalEl) {
+              historicalEl.innerHTML = `<div class="text-sm text-fin-muted p-4">Chart unavailable. ${stats.historical_coverage?.length || 0} data points available.</div>`;
+            }
+            const categoryEl = el('chart-category');
+            if (categoryEl) {
+              categoryEl.innerHTML = `<div class="text-sm text-fin-muted p-4">Chart unavailable. ${Object.keys(stats.by_category || {}).length} categories available.</div>`;
+            }
+          }
+        }
+        
+        // Render charts after a short delay to ensure DOM is ready
+        setTimeout(renderCharts, 100);
+      }
+      
+      // Load pipeline stats on page load
+      loadPipelineStats();
+      
+      // Refresh button
+      el('stats-refresh')?.addEventListener('click', loadPipelineStats);
+      el('stats-days')?.addEventListener('change', loadPipelineStats);
+      el('stats-granularity')?.addEventListener('change', loadPipelineStats);
+
+      const [ingR, phR, pfR, secR, ecbR, cftcR, limR] = await Promise.all([
+        apiFetch('/api/v1/data-collection/ingestion-status'),
+        apiFetch('/api/v1/data-collection/parse-health'),
+        apiFetch('/api/v1/data-collection/parse-failures'),
+        apiFetch('/api/v1/data-collection/sec-endpoint-status'),
+        apiFetch('/api/v1/data-collection/ecb/status'),
+        apiFetch('/api/v1/data-collection/cftc/endpoints'),
+        apiFetch('/api/v1/data-collection/api-limits'),
+      ]);
+
+      if ([ingR, phR, pfR, secR, ecbR, cftcR, limR].some(isNetworkError)) {
+        show('network-error-banner');
+      }
+
+      renderJson('card-ingestion-body', ingR.data, ingR.error);
+      renderJson('card-parse-health-body', phR.data, phR.error);
+      renderJson('card-parse-failures-body', pfR.data, pfR.error);
+      renderJson('card-sec-status-body', secR.data, secR.error);
+      renderJson('card-ecb-body', ecbR.data, ecbR.error);
+      renderJson('card-cftc-body', cftcR.data, cftcR.error);
+      renderJson('card-api-limits-body', limR.data, limR.error);
+
+      el('action-sec-rss-sync')?.addEventListener('click', async () => {
+        if (!confirm('Trigger SEC RSS sync? This may take a while.')) return;
+        const fb = el('action-feedback');
+        if (fb) { fb.textContent = 'Requesting…'; fb.classList.remove('hidden'); }
+        const r = await apiFetch('/api/v1/data-collection/sec-rss/sync', { method: 'POST' });
+        if (fb) {
+          fb.textContent = r.ok ? 'Sync triggered.' : (r.error || `HTTP ${r.status}`);
+          fb.classList.remove('hidden');
+        }
+      });
+
+      wireConnectForm();
+    })();
+  </script>
+</DashboardLayout>

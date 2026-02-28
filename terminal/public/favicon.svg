@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <style>
+    .bg { fill: #0f172a; }
+    .stem { fill: #2563eb; }
+    .arm-top { fill: #2563eb; }
+    .arm-mid { fill: #3b82f6; }
+    @media (prefers-color-scheme: dark) {
+      .bg { fill: #1e293b; }
+    }
+  </style>
+  <rect class="bg" width="32" height="32" rx="4"/>
+  <rect class="stem" x="8" y="5" width="3" height="22" rx="1.5"/>
+  <rect class="arm-top" x="13" y="5" width="12" height="3" rx="1.5"/>
+  <rect class="arm-mid" x="13" y="14" width="10" height="3" rx="1.5"/>
+</svg>

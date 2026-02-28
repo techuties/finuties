@@ -1,0 +1,32 @@
+---
+import DashboardLayout from '../layouts/DashboardLayout.astro';
+---
+
+<DashboardLayout
+  title="Disconnect — FinUties"
+  description="Clear API connection and return to login."
+>
+  <div class="mx-auto max-w-md px-4 py-16 text-center">
+    <p class="text-fin-muted" id="disconnect-msg">Disconnecting…</p>
+  </div>
+
+  <script>
+    import { getDefaultApiBase } from '../lib/api-client';
+
+    // Clear localStorage config (both terminal and www keys)
+    try { localStorage.removeItem('finuties-api-config'); localStorage.removeItem('fin_token'); localStorage.removeItem('fin_api_base'); } catch(e) {}
+
+    // Clear cross-domain session cookie
+    document.cookie = 'fin_session=;domain=.finuties.com;path=/;max-age=0;SameSite=Lax;Secure';
+
+    // Clear httpOnly cookies via logout endpoint
+    fetch(`${getDefaultApiBase().replace(/\/+$/, '')}/api/v1/auth/logout`, {
+      method: 'POST',
+      credentials: 'include',
+    }).catch(function() {}).finally(function() {
+      var msg = document.getElementById('disconnect-msg');
+      if (msg) msg.textContent = 'Disconnected. Redirecting…';
+      window.location.href = '/';
+    });
+  </script>
+</DashboardLayout>

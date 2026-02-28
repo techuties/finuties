@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 40" fill="none">
+  <!-- Split-weight wordmark: Fin (regular) U (extrabold blue) ties (regular) — for light backgrounds -->
+  <text x="0" y="30" font-family="Inter,system-ui,sans-serif" font-size="28" font-weight="400" fill="#0f172a" letter-spacing="-0.5">Fin</text>
+  <text x="55" y="30" font-family="Inter,system-ui,sans-serif" font-size="28" font-weight="800" fill="#2563eb" letter-spacing="-0.5">U</text>
+  <text x="76" y="30" font-family="Inter,system-ui,sans-serif" font-size="28" font-weight="400" fill="#0f172a" letter-spacing="-0.5">ties</text>
+</svg>

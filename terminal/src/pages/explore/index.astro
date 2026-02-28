@@ -1,0 +1,909 @@
+---
+import DashboardLayout from '../../layouts/DashboardLayout.astro';
+---
+
+<DashboardLayout
+  title="Explore - FinUties"
+  description="In-depth entity explorer: companies, investors, and stocks with SEC filings, holdings, insider transactions, and more."
+  active="explore"
+>
+  <!-- Auth gate: centralized API key policy -->
+  <script>
+  import { enforceApiKeySession } from '../../lib/auth/bootstrap';
+  import { getDefaultApiBase } from '../../lib/api-client';
+
+  enforceApiKeySession({
+    defaultBase: getDefaultApiBase(),
+    redirectTo: '/?apikey=1',
+    logPrefix: 'explore-auth',
+  });
+  </script>
+
+  <!-- Entity header (full-width, no max-w cap) -->
+  <div class="border-b border-fin-800 bg-fin-900/60 backdrop-blur px-4 py-3 sm:px-6">
+    <div class="flex items-center gap-4 px-3 sm:px-4 lg:px-6 2xl:px-8">
+      <a href="/dashboard" class="flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors flex-shrink-0">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" /></svg>
+        Dashboard
+      </a>
+      <div class="h-5 w-px bg-slate-700 flex-shrink-0"></div>
+      <div class="flex items-center gap-3 min-w-0 flex-1">
+        <span id="entity-type-badge" class="flex-shrink-0 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-fin-600/20 text-fin-400"></span>
+        <div class="min-w-0">
+          <h1 id="entity-name" class="text-lg font-semibold text-slate-200 truncate">Loading...</h1>
+          <p id="entity-sub" class="text-xs text-slate-500 truncate"></p>
+        </div>
+      </div>
+      <!-- Persistent mini search -->
+      <div id="header-search-wrap" class="relative flex-shrink-0 hidden sm:block">
+        <input
+          id="header-search"
+          type="text"
+          placeholder="Search..."
+          role="combobox"
+          aria-label="Quick search"
+          aria-autocomplete="list"
+          aria-controls="header-search-drop"
+          aria-expanded="false"
+          aria-activedescendant=""
+          class="w-40 lg:w-56 rounded-lg bg-fin-800/60 border border-fin-700/50 px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:border-fin-500 focus:outline-none focus:ring-1 focus:ring-fin-500/50"
+        />
+        <div id="header-search-drop" class="absolute right-0 top-full mt-1 w-72 rounded-xl border border-fin-800 bg-fin-900/95 backdrop-blur shadow-xl z-50 hidden overflow-hidden" role="listbox" aria-label="Search suggestions"></div>
+      </div>
+      <div id="zoom-mount" class="flex-shrink-0"></div>
+    </div>
+  </div>
+
+  <!-- Breadcrumb trail -->
+  <div id="breadcrumb-bar" class="hidden px-3 sm:px-4 lg:px-6 2xl:px-8 pt-3">
+    <nav class="flex items-center gap-1.5 text-xs text-slate-500 overflow-x-auto whitespace-nowrap" aria-label="Exploration trail"></nav>
+  </div>
+
+  <!-- Entity summary card slot -->
+  <div id="entity-summary" class="hidden px-3 sm:px-4 lg:px-6 2xl:px-8 pt-3"></div>
+
+  <!-- Related entities slot -->
+  <div id="related-entities" class="hidden px-3 sm:px-4 lg:px-6 2xl:px-8 pt-2"></div>
+
+  <!-- Main content: full-width pod grid (no max-w cap) -->
+  <div id="explore-content" class="px-3 sm:px-4 lg:px-6 2xl:px-8 py-4">
+    <div id="sections-grid">
+      <!-- Visible loading state replaced by JS -->
+      <div id="explore-boot-loader" class="flex flex-col items-center justify-center gap-3 py-16 text-slate-400">
+        <svg class="animate-spin h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+        <span class="text-sm">Initializing Explorer...</span>
+      </div>
+    </div>
+    <div id="no-entity" class="hidden text-center py-20">
+      <svg class="w-16 h-16 mx-auto text-slate-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
+      <h2 class="text-lg font-semibold text-slate-200 mb-1">No entity specified</h2>
+      <p class="text-sm text-slate-500 mb-4">Navigate here from a dashboard card by clicking on a company, investor, or stock.</p>
+      <a href="/dashboard" class="inline-flex items-center gap-2 rounded-lg bg-fin-600 px-4 py-2 text-sm font-medium text-white hover:bg-fin-500 transition-colors">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" /></svg>
+        Back to Dashboard
+      </a>
+    </div>
+  </div>
+
+  <!-- Client-side explore router -->
+  <script>
+    // == Layout engine + shared constants ==
+    import {
+      PANEL_CLS, badgeCls, TYPE_COLORS, TYPE_LABELS,
+      esc, fmtErr, spinnerHtml, errorHtml, podGrid,
+      zoomControl, initZoom,
+      type RenderContext,
+    } from '../../lib/explore/layout';
+
+    // == Section system (custom sections for entity detail) ==
+    import {
+      getSectionsForEntity, getSectionDef, getCustomSectionId,
+      humanizeResourceTitle, exploreLink, normalizeItems,
+      type EntityType, type EntityParams, type SectionData, type SectionDefinition,
+    } from '../../lib/explore-sections';
+    import { apiFetch } from '../../lib/api-client';
+    import { renderGenericTablePanel, type DiscoveredResource } from '../../lib/explore/generic-table-section';
+
+    // Source registry (for data-mode routing)
+    import {
+      CATEGORY_MAP, SOURCE_MAP,
+      type CategoryId,
+    } from '../../lib/source-registry';
+
+    // == Smart search resolver ==
+    import { resolveSearch, resolveSearchLocal, resolveSearchProgressive, ICONS, type ResolvedMatch, type ResolveResult, MATCH_COLORS } from '../../lib/explore/smart-resolver';
+
+    // == Lazy loaders for code-split section & view modules ==
+    let _sectionsLoaded = false;
+    async function ensureSectionsLoaded(): Promise<void> {
+      if (_sectionsLoaded) return;
+      await Promise.all([
+        import('../../lib/explore/filings-section'),
+        import('../../lib/explore/insider-tx-section'),
+        import('../../lib/explore/exec-comp-section'),
+        import('../../lib/explore/financial-statements-section'),
+        import('../../lib/explore/holdings-section'),
+        import('../../lib/explore/ownership-section'),
+        import('../../lib/explore/stock-info-section'),
+        import('../../lib/explore/stock-prices-section'),
+        import('../../lib/explore/investors-section'),
+        import('../../lib/explore/latest-investments-section'),
+        import('../../lib/explore/investor-portfolio-section'),
+        import('../../lib/explore/news-section'),
+        import('../../lib/explore/money-flow-section'),
+        import('../../lib/explore/agreements-section'),
+      ]);
+      _sectionsLoaded = true;
+    }
+
+    const viewLoaders = {
+      countryOverview: () => import('../../lib/explore/views/country-overview').then(m => m.renderCountryOverview),
+      sourceDetail:    () => import('../../lib/explore/views/source-detail').then(m => m.renderSourceDetail),
+      filingDetail:    () => import('../../lib/explore/views/filing-detail').then(m => m.renderFilingDetail),
+      personDetail:    () => import('../../lib/explore/views/person-detail').then(m => m.renderPersonDetail),
+      econIndicator:   () => import('../../lib/explore/views/econ-indicator').then(m => m.renderEconIndicator),
+      macroSeries:     () => import('../../lib/explore/views/macro-series').then(m => m.renderMacroSeries),
+      calendarView:    () => import('../../lib/explore/views/calendar-view').then(m => m.renderCalendarView),
+      positioningView: () => import('../../lib/explore/views/positioning-view').then(m => m.renderPositioningView),
+      dataCatalog:     () => import('../../lib/explore/views/data-catalog').then(m => ({ renderCategorySourceList: m.renderCategorySourceList, renderAllCategories: m.renderAllCategories })),
+      landing:         () => import('../../lib/explore/views/landing').then(m => m.renderLanding),
+    };
+
+    // == Types ==
+    interface SuggestEntity { name: string; types: string[]; symbol?: string | null; cik?: string | null; exchange?: string | null; investor_type?: string | null }
+    interface SuggestResponse { q: string; suggestions: SuggestEntity[] }
+    interface DiscoverResponse { entity: { cik: string | null; symbol: string | null }; resources: DiscoveredResource[] }
+    interface DiscoveryContract {
+      view_key: string;
+      required_any_of: string[];
+      priority: number;
+      label?: string;
+    }
+
+    let _discoverContractCache: DiscoveryContract[] | null = null;
+    async function getDiscoverContract(): Promise<DiscoveryContract[]> {
+      if (_discoverContractCache) return _discoverContractCache;
+      try {
+        const res = await apiFetch<{ contracts: DiscoveryContract[] }>('/api/v1/search/discover-contract');
+        if (res.ok && res.data?.contracts?.length) {
+          _discoverContractCache = res.data.contracts;
+          return _discoverContractCache;
+        }
+      } catch {}
+      _discoverContractCache = [];
+      return _discoverContractCache;
+    }
+    console.log('[explore] Module loaded');
+
+    function initExplore(): void {
+    console.log('[explore] initExplore() called');
+
+    // Remove boot loader
+    const bootLoader = document.getElementById('explore-boot-loader');
+    if (bootLoader) bootLoader.remove();
+
+    // == Parse query params ==
+    const params = new URLSearchParams(window.location.search);
+    const entityType = params.get('type') as EntityType | null;
+    const entityCik = params.get('cik') || undefined;
+    const entitySymbol = params.get('symbol') || undefined;
+    const entityName = params.get('name') || undefined;
+    const entityAccession = params.get('accession') || undefined;
+    const entityFrom = params.get('from') || undefined;
+    const searchQuery = params.get('q') || undefined;
+    const econIndicator = params.get('indicator') || undefined;
+    const queryMode = params.get('mode') || undefined;
+
+    const baseTypes: EntityType[] = ['company', 'investor', 'stock'];
+    const isValidEntity = entityType && baseTypes.includes(entityType) && (entityCik || entitySymbol);
+    const isEconType = entityType === 'econ' && econIndicator;
+    const isFilingType = entityType === 'filing' && entityAccession;
+    const isPersonType = entityType === 'person' && entityCik;
+
+    // == DOM refs ==
+    const typeBadge = document.getElementById('entity-type-badge')!;
+    const nameEl = document.getElementById('entity-name')!;
+    const subEl = document.getElementById('entity-sub')!;
+    const sectionsGrid = document.getElementById('sections-grid')!;
+    const noEntity = document.getElementById('no-entity')!;
+    const breadcrumbBar = document.getElementById('breadcrumb-bar')!;
+    const breadcrumbNav = breadcrumbBar.querySelector('nav')!;
+    const entitySummarySlot = document.getElementById('entity-summary')!;
+    const relatedEntitiesSlot = document.getElementById('related-entities')!;
+
+    // == Zoom control ==
+    const zoomMount = document.getElementById('zoom-mount');
+    if (zoomMount) { zoomMount.innerHTML = zoomControl(); initZoom(); }
+
+    // == Breadcrumb trail ==
+    interface BreadcrumbEntry { label: string; url: string; type: string }
+    function loadBreadcrumbs(): BreadcrumbEntry[] {
+      try { const raw = sessionStorage.getItem('explore-trail'); return raw ? JSON.parse(raw) : []; } catch { return []; }
+    }
+    function saveBreadcrumbs(trail: BreadcrumbEntry[]): void {
+      try { sessionStorage.setItem('explore-trail', JSON.stringify(trail.slice(-10))); } catch {}
+    }
+    function updateBreadcrumbs(label: string, type: string): void {
+      const currentUrl = window.location.pathname + window.location.search;
+      let trail = loadBreadcrumbs();
+      const existingIdx = trail.findIndex((c) => c.url === currentUrl);
+      if (existingIdx >= 0) trail = trail.slice(0, existingIdx + 1);
+      else trail.push({ label, url: currentUrl, type });
+      saveBreadcrumbs(trail);
+      if (trail.length > 1) {
+        breadcrumbBar.classList.remove('hidden');
+        let html = '';
+        for (let i = 0; i < trail.length; i++) {
+          const crumb = trail[i]; const isLast = i === trail.length - 1;
+          const color = TYPE_COLORS[crumb.type] || 'bg-slate-500/20 text-slate-400';
+          if (i > 0) html += '<svg class="w-3 h-3 text-slate-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>';
+          if (isLast) html += '<span class="rounded px-1.5 py-0.5 font-medium text-slate-300 ' + color + '">' + esc(crumb.label) + '</span>';
+          else html += '<a href="' + esc(crumb.url) + '" class="rounded px-1.5 py-0.5 hover:bg-fin-800/60 transition-colors text-slate-400 hover:text-slate-200">' + esc(crumb.label) + '</a>';
+        }
+        breadcrumbNav.innerHTML = html;
+      }
+    }
+    function saveRecentSearch(label: string, url: string, type: string): void {
+      try {
+        const raw = localStorage.getItem('explore-recent') || '[]';
+        let recent: { label: string; url: string; type: string }[] = JSON.parse(raw);
+        recent = recent.filter((r) => r.url !== url);
+        recent.unshift({ label, url, type });
+        localStorage.setItem('explore-recent', JSON.stringify(recent.slice(0, 8)));
+      } catch {}
+    }
+
+    // == Shared: render a section panel ==
+    // Returns the fetch promise so callers can reuse it (avoids double-fetch).
+    function renderSectionPanel(target: HTMLElement, section: SectionDefinition, ep: EntityParams): Promise<SectionData> {
+      const panel = document.createElement('div');
+      const spanCols = section.minSize?.minCols ?? 1;
+      const spanCls = spanCols > 1 ? ' section-span-' + spanCols : '';
+      panel.className = PANEL_CLS + spanCls;
+      panel.innerHTML = `
+        <button type="button" class="section-toggle w-full flex items-center justify-between gap-3 px-4 py-3 sm:px-5 hover:bg-fin-800/60 transition-colors" aria-expanded="true" aria-label="Toggle ${esc(section.title)} section">
+          <div class="flex items-center gap-3">
+            <svg class="w-5 h-5 text-fin-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">${section.icon}</svg>
+            <span class="text-sm font-semibold text-slate-200">${esc(section.title)}</span>
+            <span class="section-cost text-[10px] font-mono text-slate-500 rounded-full bg-fin-800/60 px-2 py-0.5 hidden">0 tokens</span>
+          </div>
+          <svg class="section-chevron w-4 h-4 text-slate-500 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
+        </button>
+        <div class="section-body border-t border-fin-800">
+          <div class="section-content px-4 py-4 sm:px-5">${spinnerHtml()}</div>
+        </div>`;
+      target.appendChild(panel);
+      const toggle = panel.querySelector('.section-toggle')!;
+      const body = panel.querySelector('.section-body') as HTMLElement;
+      const chevron = panel.querySelector('.section-chevron') as HTMLElement;
+      toggle.addEventListener('click', () => {
+        const expanded = toggle.getAttribute('aria-expanded') === 'true';
+        toggle.setAttribute('aria-expanded', String(!expanded));
+        body.style.display = expanded ? 'none' : '';
+        chevron.style.transform = expanded ? 'rotate(-90deg)' : '';
+      });
+      const content = panel.querySelector('.section-content') as HTMLElement;
+      const costBadge = panel.querySelector('.section-cost') as HTMLElement;
+      const fetchPromise = section.fetch(ep);
+      fetchPromise.then((data: SectionData) => {
+        if (data.tokenCost > 0) { costBadge.textContent = `${data.tokenCost} tokens`; costBadge.classList.remove('hidden'); }
+        content.innerHTML = '';
+        try { section.render(content, data, ep); }
+        catch (renderErr) { content.innerHTML = errorHtml('Render error in ' + esc(section.title), renderErr); }
+      }).catch((err: unknown) => { content.innerHTML = errorHtml('Failed to load', err); });
+      return fetchPromise;
+    }
+    const WEIGHT_ORDER: Record<string, number> = { compact: 0, standard: 1, wide: 2 };
+    function renderTypeFallback(target: HTMLElement, ep: EntityParams, entityTypes: EntityType[]): void {
+      const seen = new Set<string>();
+      const sections: SectionDefinition[] = [];
+      for (const et of entityTypes) for (const s of getSectionsForEntity(et)) if (!seen.has(s.id)) { seen.add(s.id); sections.push(s); }
+      sections.sort((a, b) => (WEIGHT_ORDER[a.minSize?.weight || 'standard'] || 1) - (WEIGHT_ORDER[b.minSize?.weight || 'standard'] || 1));
+      for (const s of sections) renderSectionPanel(target, s, ep);
+    }
+
+    // == Resource labels + context priority ==
+    const RESOURCE_LABELS: Record<string, string> = {
+      'sec/filings': 'filings', 'sec/insider-transactions': 'insider transactions', 'sec/holdings': 'institutional holders',
+      'sec/holdings:by-stock': 'holder records', 'sec/executive-compensation': 'exec comp records',
+      'sec/beneficial-ownership': 'ownership reports', 'sec/financial-statements': 'financial statements',
+      'sec/agreements': 'agreements', 'sec/news-items': 'news items', 'sec/money-flow': 'money flow records',
+      'sec/nport-reports': 'N-PORT reports', 'sec/filing-documents': 'filing documents',
+      'sec/filing-headers': 'filing headers', 'market/stocks': 'stock info',
+      'market/stock-prices': 'price records', 'market/investors': 'investor records',
+      'system/sec-rss-entries': 'RSS entries',
+    };
+    const CONTEXT_PRIORITY: Record<string, string[]> = {
+      filing: ['sec/filings', 'sec/filing-documents'], insider: ['sec/insider-transactions'],
+      holding: ['sec/holdings', 'sec/holdings:by-stock'], person: ['sec/insider-transactions'],
+    };
+
+    // == Discovery-driven rendering ==
+    async function renderViaDiscovery(target: HTMLElement, ep: EntityParams, entityTypes: EntityType[]): Promise<void> {
+      await ensureSectionsLoaded();
+      // Auto-resolve symbol from CIK when missing (needed for stock-related discovery)
+      if (ep.cik && !ep.symbol && (ep.type === 'company' || ep.type === 'stock')) {
+        try {
+          const stockRes = await apiFetch<unknown>('/api/v1/market/stocks?cik=' + encodeURIComponent(ep.cik) + '&limit=1&fields=symbol');
+          if (stockRes.ok && stockRes.data) {
+            const stockItems = normalizeItems(stockRes.data) as Record<string, unknown>[];
+            if (stockItems.length > 0 && stockItems[0].symbol) {
+              const sym = String(stockItems[0].symbol);
+              if (!sym.startsWith('CUSIP_')) ep.symbol = sym;
+            }
+          }
+        } catch { /* continue without symbol */ }
+      }
+      const qp: string[] = [];
+      if (ep.cik) qp.push('cik=' + encodeURIComponent(ep.cik));
+      if (ep.symbol) qp.push('symbol=' + encodeURIComponent(ep.symbol));
+      if (qp.length === 0) { renderTypeFallback(target, ep, entityTypes); return; }
+      const discoverRes = await apiFetch<DiscoverResponse>('/api/v1/search/discover?' + qp.join('&'));
+      if (!discoverRes.ok || !discoverRes.data?.resources?.length) { renderTypeFallback(target, ep, entityTypes); return; }
+      const discovered = discoverRes.data.resources;
+      const summaryParts: string[] = [];
+      for (const res of discovered) { const label = RESOURCE_LABELS[res.view_key]; if (label) summaryParts.push(label); }
+      if (summaryParts.length > 0) {
+        entitySummarySlot.classList.remove('hidden');
+        entitySummarySlot.innerHTML = '<div class="rounded-lg border border-fin-800/60 bg-fin-900/60 px-4 py-2.5 flex items-center gap-2 flex-wrap text-xs text-slate-400"><svg class="w-4 h-4 text-fin-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/></svg><span class="text-slate-300 font-medium">Data available:</span>' + summaryParts.map(p => '<span class="rounded-full bg-fin-800/60 px-2 py-0.5">' + esc(p) + '</span>').join('') + '</div>';
+      }
+      const contextFrom = entityFrom || '';
+      const priorityViewKeys = CONTEXT_PRIORITY[contextFrom] || [];
+      const contractRows = await getDiscoverContract();
+      const contractByViewKey = new Map<string, DiscoveryContract>();
+      const contractBySectionId = new Map<string, DiscoveryContract>();
+      for (const c of contractRows) {
+        contractByViewKey.set(c.view_key, c);
+        const sid = getCustomSectionId(c.view_key);
+        if (sid && !contractBySectionId.has(sid)) contractBySectionId.set(sid, c);
+      }
+      const availableIdentifiers = new Set<string>();
+      if (ep.cik) availableIdentifiers.add('cik');
+      if (ep.symbol) availableIdentifiers.add('symbol');
+
+      const customQueue: { section: SectionDefinition; viewKey: string; priority: number; contractPriority: number }[] = [];
+      const genericQueue: DiscoveredResource[] = [];
+      const renderedSectionIds = new Set<string>();
+      for (const res of discovered) {
+        const sectionId = getCustomSectionId(res.view_key);
+        if (sectionId) {
+          const section = getSectionDef(sectionId);
+          if (section && !renderedSectionIds.has(section.id)) {
+            renderedSectionIds.add(section.id);
+            const cp = contractByViewKey.get(res.view_key)?.priority ?? 999;
+            customQueue.push({ section, viewKey: res.view_key, priority: priorityViewKeys.includes(res.view_key) ? 0 : 1, contractPriority: cp });
+          }
+        } else { genericQueue.push(res); }
+      }
+      for (const et of entityTypes) {
+        for (const s of getSectionsForEntity(et)) {
+          if (renderedSectionIds.has(s.id)) continue;
+          const contract = contractBySectionId.get(s.id);
+          const reqAny = contract?.required_any_of || [];
+          if (reqAny.length > 0 && !reqAny.some(id => availableIdentifiers.has(id))) continue;
+          renderedSectionIds.add(s.id);
+          customQueue.push({ section: s, viewKey: '', priority: 2, contractPriority: contract?.priority ?? 999 });
+        }
+      }
+      customQueue.sort((a, b) => (a.priority - b.priority) || (a.contractPriority - b.contractPriority));
+      const sectionPromises: Promise<{ viewKey: string; data: SectionData }>[] = [];
+      for (const { section, viewKey } of customQueue) {
+        const fetchP = renderSectionPanel(target, section, ep);
+        if (viewKey) sectionPromises.push(fetchP.then(data => ({ viewKey, data })).catch(() => ({ viewKey, data: { payload: null, tokenCost: 0, creditsRemaining: null } })));
+      }
+      if (genericQueue.length > 0) {
+        const divider = document.createElement('div');
+        divider.className = 'flex items-center gap-3 pt-4 pb-1';
+        divider.innerHTML = '<div class="h-px flex-1 bg-fin-800"></div><span class="text-xs font-medium text-slate-500 uppercase tracking-wider">Additional Data</span><div class="h-px flex-1 bg-fin-800"></div>';
+        target.appendChild(divider);
+        for (const res of genericQueue) renderGenericTablePanel(target, res);
+      }
+      if (sectionPromises.length > 0) {
+        Promise.allSettled(sectionPromises).then(results => {
+          const relatedChips: { label: string; href: string; type: string }[] = [];
+          for (const result of results) {
+            if (result.status !== 'fulfilled') continue;
+            const { viewKey, data } = result.value;
+            if (!data.payload || typeof data.payload !== 'object') continue;
+            const items = Array.isArray(data.payload) ? data.payload : ('items' in (data.payload as Record<string, unknown>) ? (data.payload as Record<string, unknown>).items as Record<string, unknown>[] : []);
+            if (!Array.isArray(items) || items.length === 0) continue;
+            if (viewKey === 'sec/insider-transactions') {
+              const ownerCounts = new Map<string, { name: string; cik: string; count: number }>();
+              for (const tx of items as Record<string, unknown>[]) { const name = String(tx.reporting_owner_name || ''), cik = String(tx.reporting_owner_cik || ''); if (name && cik) { const e = ownerCounts.get(cik) || { name, cik, count: 0 }; e.count++; ownerCounts.set(cik, e); } }
+              for (const ins of Array.from(ownerCounts.values()).sort((a, b) => b.count - a.count).slice(0, 3)) relatedChips.push({ label: ins.name + ' (insider)', href: exploreLink({ type: 'person', cik: ins.cik, name: ins.name, from: 'insider' }), type: 'person' });
+            }
+            if (viewKey === 'sec/holdings') for (const h of (items as Record<string, unknown>[]).slice(0, 3)) { const name = String(h.investor_name || h.name || ''), cik = String(h.investor_cik || h.cik || ''); if (name && cik) relatedChips.push({ label: name + ' (holder)', href: exploreLink({ type: 'investor', cik, name, from: 'holding' }), type: 'investor' }); }
+            if (viewKey === 'sec/filings' && items.length > 0) { const l = items[0] as Record<string, unknown>; const ft = String(l.form_type || ''), acc = String(l.accession_number || ''), fa = String(l.filed_at || '').slice(0, 10); if (ft && acc) relatedChips.push({ label: ft + ' ' + fa + ' (latest)', href: exploreLink({ type: 'filing', accession: acc, name: ft, from: 'filing' }), type: 'filing' }); }
+          }
+          // Build quick-nav perspective chips based on entity params
+          const navChips: { label: string; href: string; type: string; icon: string }[] = [];
+          const curType = entityTypes[0] || '';
+          if (ep.cik && curType !== 'investor') {
+            navChips.push({ label: 'View as Investor', href: '/explore?type=investor&cik=' + encodeURIComponent(ep.cik), type: 'investor', icon: '\u{1F4BC}' });
+          }
+          if (ep.symbol && curType !== 'stock') {
+            navChips.push({ label: 'View as Stock', href: '/explore?type=stock&symbol=' + encodeURIComponent(ep.symbol), type: 'stock', icon: '\u{1F4C8}' });
+          }
+          if (ep.cik && curType !== 'company') {
+            navChips.push({ label: 'View as Company', href: '/explore?type=company&cik=' + encodeURIComponent(ep.cik), type: 'company', icon: '\u{1F3E2}' });
+          }
+          if (ep.cik) {
+            navChips.push({ label: 'View Filings', href: '/explore?mode=data&source=sec_filings&cik=' + encodeURIComponent(ep.cik), type: 'filing', icon: '\u{1F4C4}' });
+          }
+
+          const allChips = [...navChips, ...relatedChips.slice(0, 6)];
+          if (allChips.length > 0) {
+            relatedEntitiesSlot.classList.remove('hidden');
+            let stripHtml = '<div class="flex items-center gap-2 overflow-x-auto pb-1">';
+            if (navChips.length > 0) {
+              stripHtml += '<span class="text-xs text-slate-500 font-medium flex-shrink-0">View as:</span>';
+              for (const chip of navChips) {
+                const color = TYPE_COLORS[chip.type] || 'bg-slate-500/20 text-slate-400';
+                stripHtml += '<a href="' + esc(chip.href) + '" class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap border border-fin-700/50 ' + color + ' hover:opacity-80 transition-opacity">' + esc(chip.label) + '</a>';
+              }
+            }
+            if (relatedChips.length > 0) {
+              stripHtml += '<span class="text-xs text-slate-500 font-medium flex-shrink-0 ml-2">Related:</span>';
+              for (const chip of relatedChips.slice(0, 6)) {
+                const color = TYPE_COLORS[chip.type] || 'bg-slate-500/20 text-slate-400';
+                stripHtml += '<a href="' + esc(chip.href) + '" class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap ' + color + ' hover:opacity-80 transition-opacity">' + esc(chip.label) + '</a>';
+              }
+            }
+            stripHtml += '</div>';
+            relatedEntitiesSlot.innerHTML = stripHtml;
+          }
+        });
+      }
+    }
+
+    // == Build RenderContext ==
+    const ctx: RenderContext = {
+      params, typeBadge, nameEl, subEl, sectionsGrid,
+      entitySummarySlot, relatedEntitiesSlot, breadcrumbBar, breadcrumbNav,
+      updateBreadcrumbs, saveRecentSearch, renderSectionPanel, renderViaDiscovery, renderTypeFallback,
+    };
+
+    // ====================================================================
+    // MODE DISPATCHER
+    // ====================================================================
+
+    // == Disambiguation UI builder ==
+    function renderDisambiguation(result: ResolveResult, isLocalOnly?: boolean): string {
+      const TYPE_LABELS_MAP: Record<string, string> = { country: 'Country', entity: 'Company / Investor / Stock', dataset: 'Data Source', category: 'Data Category', vocabulary: 'Dataset' };
+      const TYPE_ICONS_MAP: Record<string, string> = {
+        country: '<path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3"/>',
+        entity: '<path stroke-linecap="round" stroke-linejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21"/>',
+        dataset: '<path stroke-linecap="round" stroke-linejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375"/>',
+        category: '<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6z"/>',
+        vocabulary: '<path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25v14.25"/>',
+      };
+
+      // Group matches by type
+      const grouped = new Map<string, ResolvedMatch[]>();
+      for (const m of result.matches) {
+        const list = grouped.get(m.type) || [];
+        list.push(m);
+        grouped.set(m.type, list);
+      }
+
+      let html = '<div class="text-center mb-6"><p class="text-sm text-slate-400">Multiple matches found for <span class="text-slate-200 font-semibold">"' + esc(result.query) + '"</span></p>';
+      if (isLocalOnly) {
+        html += '<p class="text-[10px] text-blue-400 mt-1 flex items-center justify-center gap-1"><span class="inline-block w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></span> Searching companies &amp; entities\u2026</p>';
+      } else {
+        html += '<p class="text-[10px] text-slate-600 mt-1">Resolved in ' + result.elapsed + 'ms</p>';
+      }
+      html += '</div>';
+      html += '<div class="pod-grid">';
+
+      for (const [type, matches] of grouped) {
+        const typeLabel = TYPE_LABELS_MAP[type] || type;
+        const typeIcon = TYPE_ICONS_MAP[type] || '';
+        let inner = '<div class="divide-y divide-fin-800/40">';
+        for (const m of matches.slice(0, 5)) {
+          inner += '<a href="' + esc(m.href) + '" class="flex items-center gap-3 py-2 hover:bg-fin-800/30 transition-colors group rounded-lg px-2 -mx-2">';
+          inner += '<svg class="w-4 h-4 flex-shrink-0 text-slate-500 group-hover:text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">' + m.icon + '</svg>';
+          inner += '<div class="flex-1 min-w-0">';
+          inner += '<p class="text-xs font-medium text-slate-200 group-hover:text-white truncate">' + esc(m.label) + '</p>';
+          inner += '<p class="text-[10px] text-slate-500 truncate">' + esc(m.description) + '</p>';
+          inner += '</div>';
+          const qDot = m.score >= 90 ? 'bg-emerald-500' : m.score >= 70 ? 'bg-amber-500' : 'bg-slate-500';
+          inner += '<span class="w-1.5 h-1.5 rounded-full flex-shrink-0 ' + qDot + '" title="Relevance: ' + Math.round(m.score) + '"></span>';
+          inner += '</a>';
+        }
+        inner += '</div>';
+
+        const span = matches.length >= 3 ? 2 : 1;
+        html += '<div class="rounded-xl border border-fin-800 bg-fin-900/80 backdrop-blur shadow-sm overflow-hidden' + (span === 2 ? ' pod-span-2' : '') + '">';
+        html += '<div class="px-3 py-2 border-b border-fin-800 flex items-center gap-2">';
+        html += '<svg class="w-4 h-4 text-fin-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">' + typeIcon + '</svg>';
+        html += '<span class="text-xs font-semibold text-slate-200">' + esc(typeLabel) + '</span>';
+        html += '<span class="ml-auto text-[10px] rounded-full px-1.5 py-0.5 font-medium bg-fin-800/60 text-slate-400">' + matches.length + '</span>';
+        html += '</div><div class="px-3 py-2">' + inner + '</div></div>';
+      }
+
+      html += '</div>';
+      return html;
+    }
+
+    // == Auto-navigate for single entity match ==
+    async function handleEntityMatch(match: ResolvedMatch): Promise<void> {
+      if (!match.cik && !match.symbol) {
+        // No CIK/symbol -- just navigate
+        window.location.href = match.href;
+        return;
+      }
+      // Render entity detail inline
+      const eTypes = (match.subTypes || ['company']).filter((t): t is EntityType => baseTypes.includes(t as EntityType));
+      if (eTypes.length === 0) eTypes.push('company');
+      const ep: EntityParams = { type: eTypes.includes('company') ? 'company' : eTypes[0], cik: match.cik, symbol: match.symbol, name: match.label };
+      typeBadge.textContent = eTypes.map(t => TYPE_LABELS[t] || t).join(' + ');
+      typeBadge.className = badgeCls(TYPE_COLORS[eTypes[0]] || 'bg-fin-600/20 text-fin-400');
+      nameEl.textContent = match.label;
+      subEl.textContent = match.description;
+      updateBreadcrumbs(match.label, eTypes[0]);
+      saveRecentSearch(match.label, window.location.pathname + window.location.search, eTypes[0]);
+      sectionsGrid.innerHTML = '';
+      await renderViaDiscovery(sectionsGrid, ep, eTypes);
+    }
+
+    if (searchQuery && !isValidEntity) {
+      // == Smart Search mode (progressive: local results → API results) ==
+      noEntity.classList.add('hidden');
+      typeBadge.textContent = 'Search'; typeBadge.className = badgeCls('bg-amber-500/20 text-amber-400');
+      nameEl.textContent = '"' + searchQuery + '"';
+      subEl.textContent = 'Resolving across entities, countries, datasets, and more...';
+      sectionsGrid.innerHTML = spinnerHtml('Resolving...');
+
+      let fullResultHandled = false;
+
+      async function applySearchResult(result: ResolveResult): Promise<void> {
+        if (result.matches.length === 0) {
+          typeBadge.textContent = 'Search'; typeBadge.className = badgeCls('bg-amber-500/20 text-amber-400');
+          nameEl.textContent = 'No results for "' + searchQuery + '"';
+          subEl.textContent = result.localOnly ? 'Entity search is temporarily slow' : '';
+          let noHtml = '<div class="text-center py-16">';
+          noHtml += '<p class="text-sm text-slate-400">No results found for "<span class="text-slate-200">' + esc(searchQuery!) + '</span>"</p>';
+          if (result.localOnly) {
+            noHtml += '<p class="text-[10px] text-amber-400/80 mt-2">The entity database is currently slow. Try again in a moment.</p>';
+          }
+          noHtml += '<p class="text-[10px] text-slate-600 mt-2">Try a company name, stock ticker, country, or data source</p></div>';
+          sectionsGrid.innerHTML = noHtml;
+          return;
+        }
+
+        const best = result.best;
+
+        if (!result.hasConflict && best) {
+          if (best.type === 'entity') {
+            await handleEntityMatch(best);
+          } else if (best.type === 'country') {
+            typeBadge.textContent = 'Country'; typeBadge.className = badgeCls(MATCH_COLORS.country);
+            nameEl.textContent = best.label; subEl.textContent = best.description;
+            updateBreadcrumbs(best.label, 'data');
+            saveRecentSearch(best.label, window.location.pathname + window.location.search, 'country');
+            const countryUrl = new URL(best.href, window.location.origin);
+            ctx.params.set('country', countryUrl.searchParams.get('country') || best.iso3 || '');
+            ctx.params.set('mode', 'data');
+            sectionsGrid.innerHTML = '';
+            const renderCountryOverview = await viewLoaders.countryOverview();
+            await renderCountryOverview(ctx);
+          } else {
+            window.location.href = best.href;
+            return;
+          }
+
+          const others = result.matches.filter(m => m !== best);
+          if (others.length > 0) {
+            const otherPanel = document.createElement('div');
+            otherPanel.className = PANEL_CLS + ' mt-6';
+            let oh = '<button type="button" class="other-toggle w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-fin-800/60 transition-colors" aria-expanded="false">';
+            oh += '<div class="flex items-center gap-3"><span class="text-sm font-semibold text-slate-300">Also matches</span><span class="rounded-full px-2 py-0.5 text-[10px] font-semibold bg-slate-500/20 text-slate-400">' + others.length + '</span></div>';
+            oh += '<svg class="other-chevron w-4 h-4 text-slate-500 transition-transform rotate-[-90deg]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg></button>';
+            oh += '<div class="other-body border-t border-fin-800 hidden"><div class="divide-y divide-fin-800/60">';
+            for (const o of others.slice(0, 10)) {
+              oh += '<a href="' + esc(o.href) + '" class="flex items-center gap-3 px-4 py-3 hover:bg-fin-800/40 transition-colors group">';
+              oh += '<svg class="w-4 h-4 flex-shrink-0 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">' + o.icon + '</svg>';
+              oh += '<div class="flex-1 min-w-0"><p class="text-sm font-medium text-slate-200 group-hover:text-fin-400 truncate">' + esc(o.label) + '</p>';
+              oh += '<p class="text-xs text-slate-500 truncate mt-0.5">' + esc(o.description) + '</p></div>';
+              oh += '<span class="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ' + o.color + '">' + esc(o.type) + '</span></a>';
+            }
+            oh += '</div></div>';
+            otherPanel.innerHTML = oh;
+            sectionsGrid.appendChild(otherPanel);
+            const ot = otherPanel.querySelector('.other-toggle')!;
+            const ob = otherPanel.querySelector('.other-body') as HTMLElement;
+            const oc = otherPanel.querySelector('.other-chevron') as HTMLElement;
+            ot.addEventListener('click', () => { const exp = ot.getAttribute('aria-expanded') === 'true'; ot.setAttribute('aria-expanded', String(!exp)); ob.classList.toggle('hidden'); oc.style.transform = exp ? 'rotate(-90deg)' : ''; });
+          }
+        } else {
+          typeBadge.textContent = 'Multiple matches'; typeBadge.className = badgeCls('bg-amber-500/20 text-amber-400');
+          nameEl.textContent = '"' + searchQuery + '"';
+          const catCount = new Set(result.matches.map(m => m.type)).size;
+          subEl.textContent = result.matches.length + ' matches across ' + catCount + ' categories';
+          sectionsGrid.innerHTML = renderDisambiguation(result, false);
+        }
+      }
+
+      resolveSearchProgressive(searchQuery, {
+        onLocal(localResult) {
+          if (fullResultHandled) return;
+          if (localResult.matches.length > 0) {
+            typeBadge.textContent = 'Multiple matches'; typeBadge.className = badgeCls('bg-amber-500/20 text-amber-400');
+            nameEl.textContent = '"' + searchQuery + '"';
+            subEl.textContent = localResult.matches.length + ' local matches \u2022 searching entities...';
+            sectionsGrid.innerHTML = renderDisambiguation(localResult, true);
+          } else {
+            nameEl.textContent = '"' + searchQuery + '"';
+            subEl.textContent = 'Searching companies & entities...';
+            sectionsGrid.innerHTML = '<div class="text-center py-12">' +
+              '<div class="inline-flex items-center gap-2 text-sm text-blue-400">' +
+              '<span class="inline-block w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></span>' +
+              'Searching entities for "' + esc(searchQuery!) + '"...</div>' +
+              '<p class="text-[10px] text-slate-600 mt-3">This may take a few seconds</p></div>';
+          }
+        },
+        onFull(fullResult) {
+          fullResultHandled = true;
+          applySearchResult(fullResult).catch(err => {
+            sectionsGrid.innerHTML = errorHtml('Something went wrong', err);
+          });
+        },
+      });
+
+    } else if (isFilingType && entityAccession) {
+      // == Filing detail ==
+      noEntity.classList.add('hidden');
+      viewLoaders.filingDetail().then(fn => fn(ctx));
+
+    } else if (isPersonType && entityCik) {
+      // == Person detail ==
+      noEntity.classList.add('hidden');
+      viewLoaders.personDetail().then(fn => fn(ctx));
+
+    } else if (isValidEntity) {
+      // == Entity detail (company/investor/stock) ==
+      noEntity.classList.add('hidden');
+      const ep: EntityParams = { type: entityType as 'company' | 'investor' | 'stock', cik: entityCik, symbol: entitySymbol, name: entityName };
+      const entityDisplayName = entityName || entitySymbol || 'CIK ' + entityCik;
+      typeBadge.textContent = TYPE_LABELS[entityType] || entityType;
+      typeBadge.className = badgeCls(TYPE_COLORS[entityType] || 'bg-fin-600/20 text-fin-400');
+      nameEl.textContent = entityDisplayName;
+      const subtitles: string[] = []; if (entityCik) subtitles.push('CIK: ' + entityCik); if (entitySymbol) subtitles.push('Symbol: ' + entitySymbol);
+      subEl.textContent = subtitles.join(' \u00B7 ');
+      updateBreadcrumbs(entityDisplayName, entityType);
+      saveRecentSearch(entityDisplayName, window.location.pathname + window.location.search, entityType);
+      renderViaDiscovery(sectionsGrid, ep, [entityType as 'company' | 'investor' | 'stock']).catch(() => { ensureSectionsLoaded().then(() => renderTypeFallback(sectionsGrid, ep, [entityType as 'company' | 'investor' | 'stock'])); });
+
+    } else if (isEconType && econIndicator) {
+      // == Economic Indicator ==
+      noEntity.classList.add('hidden');
+      viewLoaders.econIndicator().then(fn => fn(ctx));
+
+    } else if (queryMode === 'query') {
+      // == Query builder ==
+      noEntity.classList.add('hidden');
+      const qDomain = params.get('domain') || ''; const qResource = params.get('resource') || '';
+      const qResourceLabel = qResource.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      typeBadge.textContent = 'Query'; typeBadge.className = badgeCls('bg-cyan-500/20 text-cyan-400');
+      nameEl.textContent = qResourceLabel || 'Data Query'; subEl.textContent = qDomain ? 'Domain: ' + qDomain : '';
+      const filterKeys = Array.from(params.keys()).filter(k => !['type', 'mode', 'domain', 'resource'].includes(k));
+      let fh = '<div class="' + PANEL_CLS + '"><div class="px-4 py-3 border-b border-fin-800 flex items-center gap-3"><svg class="w-5 h-5 text-cyan-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z"/></svg><span class="text-sm font-semibold text-slate-200">Filters</span></div><div class="px-4 py-4"><form id="query-form" class="flex flex-wrap gap-3 items-end">';
+      for (const key of ['cik', 'symbol', 'ticker', 'form_type', 'currency', 'source', 'commodity', 'limit']) { const val = params.get(key) || ''; const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); fh += '<div class="flex flex-col gap-1"><label class="text-[10px] uppercase tracking-wider text-slate-500">' + esc(label) + '</label><input type="text" name="' + esc(key) + '" value="' + esc(val) + '" placeholder="' + esc(label) + '" class="rounded-lg bg-fin-800/60 border border-fin-700 px-3 py-1.5 text-xs text-slate-200 placeholder-slate-600 focus:border-fin-500 focus:outline-none w-32"></div>'; }
+      fh += '<button type="submit" class="rounded-lg bg-fin-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-fin-500 transition-colors">Search</button></form></div></div><div id="query-results" class="mt-4"></div>';
+      sectionsGrid.innerHTML = fh;
+      const qForm = document.getElementById('query-form') as HTMLFormElement; const qResults = document.getElementById('query-results')!;
+      async function runQuery(): Promise<void> {
+        const fd = new FormData(qForm); let ap = '/api/v1/' + encodeURIComponent(qDomain) + '/' + encodeURIComponent(qResource) + '?'; const qps: string[] = [];
+        for (const [k, v] of fd.entries()) { const val = String(v).trim(); if (val) qps.push(encodeURIComponent(k) + '=' + encodeURIComponent(val)); }
+        if (!qps.some(p => p.startsWith('limit='))) qps.push('limit=25'); ap += qps.join('&');
+        qResults.innerHTML = spinnerHtml('Querying...');
+        const res: DiscoveredResource = { view_key: qDomain + '/' + qResource, domain: qDomain, resource: qResource, filter_key: '', filter_value: '', api_path: ap };
+        qResults.innerHTML = ''; renderGenericTablePanel(qResults, res);
+      }
+      qForm.addEventListener('submit', e => { e.preventDefault(); runQuery(); });
+      if (filterKeys.some(k => params.get(k))) runQuery();
+
+    } else if (queryMode === 'data') {
+      // == Free-Data Explorer ==
+      noEntity.classList.add('hidden'); sectionsGrid.classList.remove('hidden');
+      const dataCatParam = params.get('category') as CategoryId | null;
+      const dataSourceParam = params.get('source') || '';
+      const dataCountryParam = params.get('country') || '';
+
+      // Route to dedicated views based on source category
+      const MACRO_CATS = new Set(['rates', 'macro']);
+      const routedSrc = dataSourceParam ? SOURCE_MAP.get(dataSourceParam) : null;
+
+      // Lazy-load the correct view module based on routing
+      if (dataCountryParam && !dataSourceParam) viewLoaders.countryOverview().then(fn => fn(ctx));
+      else if (routedSrc && MACRO_CATS.has(routedSrc.category)) viewLoaders.macroSeries().then(fn => fn(ctx));
+      else if (routedSrc && routedSrc.category === 'calendar') viewLoaders.calendarView().then(fn => fn(ctx));
+      else if (routedSrc && routedSrc.category === 'positioning') viewLoaders.positioningView().then(fn => fn(ctx));
+      else if (routedSrc && routedSrc.id.startsWith('cftc_')) viewLoaders.positioningView().then(fn => fn(ctx));
+      else if (dataCatParam === 'calendar') viewLoaders.calendarView().then(fn => fn(ctx));
+      else if (dataCatParam === 'positioning' && !dataSourceParam) viewLoaders.dataCatalog().then(m => m.renderCategorySourceList(ctx));
+      else if (dataCatParam && MACRO_CATS.has(dataCatParam) && !dataSourceParam) viewLoaders.dataCatalog().then(m => m.renderCategorySourceList(ctx));
+      else if (dataSourceParam && SOURCE_MAP.has(dataSourceParam)) viewLoaders.sourceDetail().then(fn => fn(ctx));
+      else if (dataCatParam && CATEGORY_MAP.has(dataCatParam)) viewLoaders.dataCatalog().then(m => m.renderCategorySourceList(ctx));
+      else viewLoaders.dataCatalog().then(m => m.renderAllCategories(ctx));
+
+    } else {
+      // == Smart Landing Page ==
+      noEntity.classList.add('hidden'); sectionsGrid.classList.remove('hidden');
+      viewLoaders.landing().then(fn => fn(ctx));
+    }
+
+    // ── Persistent header search bar ──
+    const headerSearch = document.getElementById('header-search') as HTMLInputElement | null;
+    const headerDrop = document.getElementById('header-search-drop');
+    if (headerSearch && headerDrop) {
+      let hDebounce: ReturnType<typeof setTimeout> | null = null;
+      let hSelectedIdx = -1;
+
+      function setDropVisible(visible: boolean): void {
+        headerDrop.classList.toggle('hidden', !visible);
+        headerSearch.setAttribute('aria-expanded', String(visible));
+        if (!visible) { hSelectedIdx = -1; headerSearch.setAttribute('aria-activedescendant', ''); }
+      }
+
+      function highlightOption(items: NodeListOf<Element>, idx: number): void {
+        items.forEach((el, i) => {
+          const active = i === idx;
+          (el as HTMLElement).classList.toggle('bg-fin-800/80', active);
+          el.setAttribute('aria-selected', String(active));
+        });
+        const activeId = idx >= 0 && items[idx] ? items[idx].id : '';
+        headerSearch.setAttribute('aria-activedescendant', activeId);
+      }
+
+      function buildDropdownHtml(items: ResolvedMatch[], startIdx: number): string {
+        let html = '';
+        for (let i = 0; i < items.length; i++) {
+          const m = items[i];
+          const idx = startIdx + i;
+          html += '<a href="' + esc(m.href) + '" id="hs-opt-' + idx + '" data-idx="' + idx + '" role="option" aria-selected="false" class="hs-item flex items-center gap-2 px-3 py-2 hover:bg-fin-800/60 transition-colors cursor-pointer' + (idx > 0 ? ' border-t border-fin-800/40' : '') + '">';
+          html += '<div class="flex-1 min-w-0"><p class="text-xs font-medium text-slate-200 truncate">' + esc(m.label) + '</p>';
+          html += '<p class="text-[9px] text-slate-500 truncate">' + esc(m.description) + '</p></div>';
+          html += '<span class="flex-shrink-0 text-[9px] rounded-full px-1.5 py-0.5 font-medium ' + m.color + '">' + esc(m.type) + '</span>';
+          html += '</a>';
+        }
+        return html;
+      }
+
+      // Prevent mousedown on dropdown from stealing focus (fixes blur/click race)
+      headerDrop.addEventListener('mousedown', (e) => e.preventDefault());
+
+      let hSuggestAbort: AbortController | null = null;
+
+      headerSearch.addEventListener('input', () => {
+        if (hDebounce) clearTimeout(hDebounce);
+        if (hSuggestAbort) { hSuggestAbort.abort(); hSuggestAbort = null; }
+        hDebounce = setTimeout(() => {
+          const val = headerSearch.value.trim();
+          if (val.length < 2) { setDropVisible(false); return; }
+          const localMatches = resolveSearchLocal(val);
+          hSelectedIdx = -1;
+
+          if (localMatches.length === 0) {
+            headerDrop.innerHTML = '<div class="px-3 py-2.5 text-[10px] text-slate-500 text-center">' +
+              'No local matches. Press <kbd class="px-1 py-0.5 rounded bg-fin-800 text-slate-400 font-mono">Enter</kbd> to search online.</div>';
+            setDropVisible(true);
+          } else {
+            headerDrop.innerHTML = buildDropdownHtml(localMatches.slice(0, 6), 0);
+            setDropVisible(true);
+          }
+
+          // Async: fetch entity suggestions from API for richer results
+          if (val.length >= 3) {
+            const localCount = Math.min(localMatches.length, 6);
+            headerDrop.insertAdjacentHTML('beforeend',
+              '<div class="hs-loading flex items-center gap-2 px-3 py-1.5 text-[10px] text-slate-600 border-t border-fin-800/40">' +
+              '<svg class="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>' +
+              '<span>Searching entities...</span></div>');
+
+            hSuggestAbort = new AbortController();
+            apiFetch<{ suggestions: SuggestEntity[] }>(
+              '/api/v1/search/suggest?q=' + encodeURIComponent(val) + '&limit=4',
+              { signal: hSuggestAbort.signal },
+            ).then(res => {
+              hSuggestAbort = null;
+              const loader = headerDrop.querySelector('.hs-loading');
+              if (loader) loader.remove();
+              if (!res.ok || !res.data?.suggestions?.length) return;
+              const localLabels = new Set(localMatches.slice(0, 6).map(m => m.label.toLowerCase()));
+              const entityItems: ResolvedMatch[] = [];
+              for (const ent of res.data.suggestions) {
+                if (localLabels.has(ent.name.toLowerCase())) continue;
+                const typeList = ent.types || ['company'];
+                const mainType = typeList.includes('company') ? 'company' : typeList[0];
+                const qps = ['type=' + mainType];
+                if (ent.cik) qps.push('cik=' + ent.cik);
+                if (ent.symbol) qps.push('symbol=' + ent.symbol);
+                qps.push('name=' + encodeURIComponent(ent.name));
+                entityItems.push({
+                  type: 'entity', label: ent.name,
+                  description: typeList.join(', ') + (ent.symbol ? ' \u00B7 ' + ent.symbol : '') + (ent.exchange ? ' \u00B7 ' + ent.exchange : ''),
+                  href: '/explore?' + qps.join('&'),
+                  icon: ICONS.entity, color: MATCH_COLORS.entity,
+                  score: 0, cik: ent.cik || undefined, symbol: ent.symbol || undefined,
+                });
+              }
+              if (entityItems.length > 0) {
+                headerDrop.insertAdjacentHTML('beforeend', buildDropdownHtml(entityItems.slice(0, 4), localCount));
+              }
+            }).catch(() => {
+              hSuggestAbort = null;
+              const loader = headerDrop.querySelector('.hs-loading');
+              if (loader) loader.remove();
+            });
+          }
+        }, 180);
+      });
+
+      headerSearch.addEventListener('keydown', (e) => {
+        const items = headerDrop.querySelectorAll('.hs-item');
+        if (e.key === 'ArrowDown' && items.length > 0) {
+          e.preventDefault(); hSelectedIdx = Math.min(hSelectedIdx + 1, items.length - 1);
+          highlightOption(items, hSelectedIdx);
+        } else if (e.key === 'ArrowUp' && items.length > 0) {
+          e.preventDefault(); hSelectedIdx = Math.max(hSelectedIdx - 1, 0);
+          highlightOption(items, hSelectedIdx);
+        } else if (e.key === 'Enter') {
+          if (hSelectedIdx >= 0 && items[hSelectedIdx]) {
+            e.preventDefault();
+            (items[hSelectedIdx] as HTMLAnchorElement).click();
+          } else if (headerSearch.value.trim()) {
+            window.location.href = '/explore?q=' + encodeURIComponent(headerSearch.value.trim());
+          }
+        } else if (e.key === 'Escape') {
+          setDropVisible(false);
+        }
+      });
+
+      headerSearch.addEventListener('blur', () => {
+        setTimeout(() => setDropVisible(false), 200);
+      });
+      headerSearch.addEventListener('focus', () => {
+        if (headerSearch.value.trim().length >= 2) headerSearch.dispatchEvent(new Event('input'));
+      });
+
+      document.addEventListener('keydown', (ev: KeyboardEvent) => {
+        if (ev.key === '/' && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {
+          const tag = document.activeElement?.tagName;
+          if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+          if ((document.activeElement as HTMLElement)?.isContentEditable) return;
+          ev.preventDefault();
+          headerSearch.focus();
+        }
+      });
+    }
+
+    console.log('[explore] Init complete');
+
+    } // end initExplore
+
+    // Run on initial load
+    try {
+      initExplore();
+    } catch (initError) {
+      console.error('[explore] INIT ERROR:', initError);
+      const grid = document.getElementById('sections-grid');
+      const nameEl = document.getElementById('entity-name');
+      if (nameEl) nameEl.textContent = 'Explorer Error';
+      if (grid) {
+        grid.innerHTML = '<div class="rounded-xl border border-red-800/40 bg-red-900/20 p-6 text-center">' +
+          '<p class="text-red-400 font-semibold mb-2">Explorer failed to initialize</p>' +
+          '<pre class="text-xs text-red-500/80 text-left bg-fin-950 rounded p-3 overflow-auto max-h-40 mt-2">' +
+          String(initError instanceof Error ? initError.stack || initError.message : initError).replace(/</g, '&lt;') +
+          '</pre></div>';
+      }
+    }
+
+    // Re-run on View Transition navigation
+    document.addEventListener('astro:after-swap', () => {
+      if (!window.location.pathname.startsWith('/explore')) return;
+      console.log('[explore] Re-init after View Transition swap');
+      try { initExplore(); } catch (err) { console.error('[explore] Re-init error:', err); }
+    });
+  </script>
+</DashboardLayout>

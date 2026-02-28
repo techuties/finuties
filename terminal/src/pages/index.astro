@@ -1,0 +1,403 @@
+---
+/**
+ * FinUties Terminal — Login Page
+ *
+ * Split-layout entry page:
+ *   Left panel:  Product identity, live data strip, capability highlights
+ *   Right panel: FinUties API key onboarding
+ */
+const API_BASE = (import.meta.env.PUBLIC_API_ORIGIN || 'https://data.finuties.com').trim();
+const ALLOW_NON_FINUTIES_API = import.meta.env.PUBLIC_ALLOW_NON_FINUTIES_API === 'true';
+---
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <title>Connect — FinUties Terminal</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    @import "tailwindcss";
+    @theme {
+      --color-fin-950: #020617;
+      --color-fin-900: #0f172a;
+      --color-fin-800: #1e293b;
+      --color-fin-700: #334155;
+      --color-fin-600: #2563eb;
+      --color-fin-500: #3b82f6;
+      --color-fin-400: #60a5fa;
+      --color-fin-muted: #64748b;
+      --color-fin-bg: #f8fafc;
+      --color-fin-success: #059669;
+      --color-fin-border: #e2e8f0;
+      --color-fin-warn: #d97706;
+      --font-sans: "Inter", system-ui, sans-serif;
+      --font-mono: "JetBrains Mono", ui-monospace, monospace;
+    }
+    html { scroll-behavior: smooth; }
+    .dot-grid {
+      background-image: radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .status-pulse { animation: pulse-dot 2s ease-in-out infinite; }
+  </style>
+</head>
+<body class="h-full bg-fin-950 font-sans text-white">
+
+  <!-- Auto-redirect check (runs before page paints) -->
+  <script is:inline>
+  (function() {
+    var ALLOW_NON_FINUTIES_API = {ALLOW_NON_FINUTIES_API ? 'true' : 'false'} === 'true';
+    function allowed(base) {
+      try {
+        var u = new URL(base);
+        if (ALLOW_NON_FINUTIES_API) return true;
+        return u.hostname === 'data.finuties.com' || u.hostname.endsWith('.finuties.com');
+      } catch (_) {
+        return false;
+      }
+    }
+    var API = (function() {
+      var fallback = {JSON.stringify(API_BASE)};
+      try {
+        var raw = localStorage.getItem('finuties-api-config');
+        if (!raw) return fallback;
+        var cfg = JSON.parse(raw);
+        if (cfg && typeof cfg.base === 'string' && cfg.base.trim() && allowed(cfg.base.trim())) return cfg.base.trim();
+      } catch (e) {}
+      return fallback;
+    })();
+
+    function getLocalToken() {
+      try {
+        var raw = localStorage.getItem('finuties-api-config');
+        if (raw) { var c = JSON.parse(raw); return (c && c.token) ? c.token : null; }
+      } catch(e) {}
+      return null;
+    }
+    function isApiKey(token) {
+      return typeof token === 'string' && token.indexOf('fin_sk_') === 0;
+    }
+    function validate(token) {
+      return fetch(API + '/api/v1/auth/me', {
+        headers: { 'Authorization': 'Bearer ' + token },
+      }).then(function(r) { return r.ok; }).catch(function() { return false; });
+    }
+
+    var localToken = getLocalToken();
+    if (localToken && isApiKey(localToken)) {
+      validate(localToken).then(function(ok) {
+        if (ok) window.location.href = '/dashboard';
+      });
+    }
+  })();
+  </script>
+
+  <div class="min-h-screen flex flex-col lg:flex-row">
+
+    <!-- ═══════════════ Left Panel: Product Identity ═══════════════ -->
+    <div class="lg:w-[45%] relative overflow-hidden bg-gradient-to-br from-fin-950 via-fin-900 to-fin-950 flex flex-col justify-center px-8 py-10 lg:px-12 lg:py-16">
+      <!-- Subtle dot grid background -->
+      <div class="absolute inset-0 dot-grid"></div>
+      <!-- Radial glow accent -->
+      <div class="absolute -top-32 -left-32 w-96 h-96 bg-fin-600/5 rounded-full blur-3xl"></div>
+      <div class="absolute -bottom-24 -right-24 w-72 h-72 bg-fin-500/5 rounded-full blur-3xl"></div>
+
+      <div class="relative z-10 max-w-md mx-auto lg:mx-0">
+        <!-- Brand Mark -->
+        <a href="https://www.finuties.com" class="inline-block group">
+          <h1 class="text-3xl lg:text-4xl tracking-tight" style="font-weight:400;color:#f1f5f9">
+            Fin<span style="font-weight:800;color:#3b82f6">U</span>ties
+            <span class="ml-2 inline-block text-sm lg:text-base font-medium text-fin-400 border border-fin-700 rounded-md px-2 py-0.5 align-middle group-hover:border-fin-500 transition-colors">Terminal</span>
+          </h1>
+        </a>
+        <p class="mt-3 text-fin-muted text-base lg:text-lg">Your financial data workspace.</p>
+
+        <!-- Live Data Strip -->
+        <div class="mt-8 grid grid-cols-3 gap-3">
+          <div class="bg-fin-900/80 border border-fin-800 rounded-lg px-3 py-2.5">
+            <div class="flex items-center gap-1.5 mb-1">
+              <span id="status-dot" class="w-2 h-2 rounded-full bg-fin-muted status-pulse"></span>
+              <span class="text-[11px] uppercase tracking-wider text-fin-muted font-medium">Status</span>
+            </div>
+            <p id="status-text" class="text-sm font-mono text-fin-muted">Checking...</p>
+          </div>
+          <div class="bg-fin-900/80 border border-fin-800 rounded-lg px-3 py-2.5">
+            <div class="mb-1">
+              <span class="text-[11px] uppercase tracking-wider text-fin-muted font-medium">Resources</span>
+            </div>
+            <p class="text-sm font-mono text-white">100+</p>
+          </div>
+          <div class="bg-fin-900/80 border border-fin-800 rounded-lg px-3 py-2.5">
+            <div class="mb-1">
+              <span class="text-[11px] uppercase tracking-wider text-fin-muted font-medium">Domains</span>
+            </div>
+            <p class="text-sm font-mono text-white">18</p>
+          </div>
+        </div>
+
+        <!-- Capability Highlights -->
+        <div class="mt-8 space-y-3">
+          <!-- API & MCP -->
+          <div class="flex items-start gap-3">
+            <div class="mt-0.5 flex-shrink-0 w-8 h-8 bg-fin-800/80 border border-fin-700/50 rounded-lg flex items-center justify-center">
+              <svg class="w-4 h-4 text-fin-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2" />
+                <circle cx="8" cy="8" r="1" fill="currentColor" />
+                <circle cx="8" cy="16" r="1" fill="currentColor" />
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-sm font-medium text-white">API &amp; MCP</h3>
+              <p class="text-xs text-fin-muted mt-0.5">100+ resources via REST and Model Context Protocol</p>
+            </div>
+          </div>
+
+          <!-- Modular Dashboard -->
+          <div class="flex items-start gap-3">
+            <div class="mt-0.5 flex-shrink-0 w-8 h-8 bg-fin-800/80 border border-fin-700/50 rounded-lg flex items-center justify-center">
+              <svg class="w-4 h-4 text-fin-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="7" rx="1" stroke-linecap="round" stroke-linejoin="round" />
+                <rect x="14" y="3" width="7" height="7" rx="1" stroke-linecap="round" stroke-linejoin="round" />
+                <rect x="3" y="14" width="7" height="7" rx="1" stroke-linecap="round" stroke-linejoin="round" />
+                <rect x="14" y="14" width="7" height="7" rx="1" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-sm font-medium text-white">Modular Dashboard</h3>
+              <p class="text-xs text-fin-muted mt-0.5">Customizable panels, real-time data catalog</p>
+            </div>
+          </div>
+
+          <!-- Analysis Studio -->
+          <div class="flex items-start gap-3">
+            <div class="mt-0.5 flex-shrink-0 w-8 h-8 bg-fin-800/80 border border-fin-700/50 rounded-lg flex items-center justify-center">
+              <svg class="w-4 h-4 text-fin-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M7 20V8m5 12V4m5 16v-6" />
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-sm font-medium text-white">Analysis Studio</h3>
+              <p class="text-xs text-fin-muted mt-0.5">Interactive charts, statistical tools, study rooms</p>
+            </div>
+          </div>
+
+          <!-- Export & Reports -->
+          <div class="flex items-start gap-3">
+            <div class="mt-0.5 flex-shrink-0 w-8 h-8 bg-fin-800/80 border border-fin-700/50 rounded-lg flex items-center justify-center">
+              <svg class="w-4 h-4 text-fin-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-sm font-medium text-white">Export &amp; Reports</h3>
+              <p class="text-xs text-fin-muted mt-0.5">Export-ready tables, charts, and analysis outputs</p>
+            </div>
+          </div>
+
+          <!-- Knowledge Base (coming soon) -->
+          <div class="flex items-start gap-3 opacity-40">
+            <div class="mt-0.5 flex-shrink-0 w-8 h-8 bg-fin-800/80 border border-fin-700/30 rounded-lg flex items-center justify-center">
+              <svg class="w-4 h-4 text-fin-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-sm font-medium text-fin-muted">Knowledge Base</h3>
+              <p class="text-xs text-fin-muted/70 mt-0.5">Coming soon</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════ Right Panel: Auth Forms ═══════════════ -->
+    <div class="lg:w-[55%] flex items-center justify-center px-6 py-10 lg:px-12 lg:py-16 bg-fin-950">
+      <div class="w-full max-w-md">
+
+        <!-- Auth Card -->
+        <div class="bg-fin-900 rounded-2xl border border-fin-800 shadow-2xl overflow-hidden">
+          <div class="border-b border-fin-800 px-6 py-3.5 lg:px-8">
+            <h2 class="text-sm font-medium text-white text-center">Connect to FinUties API</h2>
+          </div>
+
+          <div class="p-6 lg:p-8">
+            <div class="rounded-lg border border-fin-800 bg-fin-950/40 px-4 py-3 text-xs text-fin-muted">
+              Community edition authentication is handled on <a href="https://www.finuties.com/login" class="text-fin-400 hover:text-fin-500">finuties.com</a>.
+              Use your FinUties API key to connect this local terminal.
+            </div>
+
+            <div class="mt-4 flex gap-2">
+              <a href="https://www.finuties.com/login" target="_blank" rel="noopener noreferrer" class="flex-1 text-center py-2.5 bg-fin-600 hover:bg-fin-500 text-white font-semibold rounded-lg transition-colors text-sm">Login on finuties.com</a>
+              <a href="https://www.finuties.com/settings" target="_blank" rel="noopener noreferrer" class="flex-1 text-center py-2.5 bg-fin-800 hover:bg-fin-700 text-white font-semibold rounded-lg transition-colors text-sm">Open API Keys</a>
+            </div>
+
+            <form id="apikey-form" class="space-y-3" onsubmit="handleApiKeyConnect(event)">
+              <div>
+                <label for="api-key-token" class="block text-sm font-medium text-gray-300 mb-1.5">FinUties API key</label>
+                <input type="password" id="api-key-token" name="apiKey" required autocomplete="off"
+                  class="w-full px-3.5 py-2.5 bg-fin-950 border border-fin-700 rounded-lg text-white placeholder-fin-muted focus:outline-none focus:ring-2 focus:ring-fin-500 focus:border-transparent text-sm"
+                  placeholder="fin_sk_..." />
+              </div>
+              <div id="apikey-error" class="hidden text-red-400 text-sm bg-red-900/20 border border-red-800/30 rounded-lg px-3 py-2"></div>
+              <button type="submit" id="apikey-btn"
+                class="w-full py-2.5 bg-fin-800 hover:bg-fin-700 text-white font-semibold rounded-lg transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                Connect with API Key
+              </button>
+            </form>
+
+            <p class="mt-4 text-center text-fin-muted text-sm">
+              New user? <a href="https://www.finuties.com/register" class="text-fin-400 hover:text-fin-500 font-medium transition-colors">Register</a>
+              · Already have an account? <a href="https://www.finuties.com/login" class="text-fin-400 hover:text-fin-500 font-medium transition-colors">Login</a>
+              · Manage keys in <a href="https://www.finuties.com/settings" class="text-fin-400 hover:text-fin-500 font-medium transition-colors">Settings</a>
+            </p>
+            <p class="mt-2 text-center text-[11px] text-fin-muted">Terminal requires a valid FinUties API key to load user resources.</p>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="mt-6 text-center text-fin-muted text-xs">
+          <div class="flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
+            <a href="https://www.finuties.com" class="hover:text-white transition-colors">Home</a>
+            <span>&middot;</span>
+            <a href="https://www.finuties.com/privacy" class="hover:text-white transition-colors">Privacy</a>
+            <span>&middot;</span>
+            <a href="https://www.finuties.com/terms" class="hover:text-white transition-colors">Terms</a>
+            <span>&middot;</span>
+            <a href="https://www.bastilities.com/blog/finuties" target="_blank" rel="noopener noreferrer" class="hover:text-white transition-colors">Blog</a>
+            <span>&middot;</span>
+            <a href="https://github.com/techuties/finuties" target="_blank" rel="noopener noreferrer" class="hover:text-white transition-colors flex items-center gap-1">
+              <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+              GitHub
+            </a>
+            <span>&middot;</span>
+            <a href="https://www.linkedin.com/company/bastilities/" target="_blank" rel="noopener noreferrer" class="hover:text-white transition-colors flex items-center gap-1">
+              <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 24 24"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+              LinkedIn
+            </a>
+          </div>
+          <p class="mt-2 text-fin-muted/60">Part of the <a href="https://www.bastilities.com" target="_blank" rel="noopener noreferrer" class="hover:text-white transition-colors">Bastilities</a> ecosystem</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script is:inline>
+  var ALLOW_NON_FINUTIES_API = {ALLOW_NON_FINUTIES_API ? 'true' : 'false'} === 'true';
+  var API = (function() {
+    var fallback = {JSON.stringify(API_BASE)};
+    function allowed(base) {
+      try {
+        var u = new URL(base);
+        if (ALLOW_NON_FINUTIES_API) return true;
+        return u.hostname === 'data.finuties.com' || u.hostname.endsWith('.finuties.com');
+      } catch (_) {
+        return false;
+      }
+    }
+    try {
+      var raw = localStorage.getItem('finuties-api-config');
+      if (!raw) return fallback;
+      var cfg = JSON.parse(raw);
+      if (cfg && typeof cfg.base === 'string' && cfg.base.trim() && allowed(cfg.base.trim())) return cfg.base.trim();
+    } catch (e) {}
+    return fallback;
+  })();
+
+  /* ── Live API Status Check ── */
+  (function() {
+    var dot = document.getElementById('status-dot');
+    var txt = document.getElementById('status-text');
+    function setOnline() {
+      dot.className = 'w-2 h-2 rounded-full bg-fin-success status-pulse';
+      txt.textContent = 'Online';
+      txt.className = 'text-sm font-mono text-fin-success';
+    }
+
+    function setOffline() {
+      dot.className = 'w-2 h-2 rounded-full bg-red-500';
+      txt.textContent = 'Offline';
+      txt.className = 'text-sm font-mono text-red-400';
+    }
+
+    // First try a normal CORS health read; if blocked by CORS, fall back to a reachability probe.
+    fetch(API + '/health', { mode: 'cors', cache: 'no-store' })
+      .then(function(r) {
+        if (r.ok) {
+          setOnline();
+          return;
+        }
+        setOffline();
+      })
+      .catch(function() {
+        fetch(API + '/health', { mode: 'no-cors', cache: 'no-store' })
+          .then(function() { setOnline(); })
+          .catch(function() { setOffline(); });
+      });
+  })();
+
+  function showError(id, msg) {
+    var el = document.getElementById(id);
+    if (el) { el.textContent = msg; el.classList.remove('hidden'); }
+  }
+  function hideError(id) {
+    var el = document.getElementById(id);
+    if (el) { el.classList.add('hidden'); }
+  }
+
+  (function showApiKeyRequirementHint() {
+    try {
+      var q = new URLSearchParams(window.location.search);
+      if (q.get('apikey') === '1') {
+        showError('apikey-error', 'A FinUties API key is required. Create one in FinUties Settings and connect.');
+      }
+    } catch (_) {}
+  })();
+
+  async function handleApiKeyConnect(e) {
+    e.preventDefault();
+    hideError('apikey-error');
+    var btn = document.getElementById('apikey-btn');
+    btn.disabled = true;
+    btn.textContent = 'Connecting...';
+
+    var apiKey = document.getElementById('api-key-token').value.trim();
+    if (!apiKey || apiKey.indexOf('fin_sk_') !== 0) {
+      showError('apikey-error', 'Please enter a valid FinUties API key (fin_sk_...).');
+      btn.disabled = false;
+      btn.textContent = 'Connect with API Key';
+      return;
+    }
+
+    try {
+      localStorage.setItem('finuties-api-config', JSON.stringify({ base: API, token: apiKey }));
+      var check = await fetch(API + '/api/v1/auth/me', {
+        headers: { 'Authorization': 'Bearer ' + apiKey },
+      });
+      if (!check.ok) {
+        showError('apikey-error', 'API key validation failed. Verify key permissions in FinUties Settings.');
+        btn.disabled = false;
+        btn.textContent = 'Connect with API Key';
+        return;
+      }
+      window.location.href = '/dashboard';
+    } catch (_) {
+      showError('apikey-error', 'Unable to reach FinUties API. Please try again.');
+      btn.disabled = false;
+      btn.textContent = 'Connect with API Key';
+    }
+  }
+
+  </script>
+</body>
+</html>

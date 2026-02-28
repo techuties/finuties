@@ -1,0 +1,774 @@
+---
+import DashboardLayout from '../../layouts/DashboardLayout.astro';
+import ConnectForm from '../../components/ConnectForm.astro';
+
+const defaultBase = import.meta.env.PUBLIC_API_ORIGIN || 'https://data.finuties.com';
+---
+
+<DashboardLayout
+  title="Settings — FinUties"
+  description="Account settings, balance, usage statistics, and billing information."
+  active="settings"
+>
+  <div class="mx-auto max-w-[1200px] px-4 py-8 sm:px-6 lg:px-8">
+    <div id="connect-gate-wrapper" class="hidden">
+      <ConnectForm defaultBase={defaultBase} />
+    </div>
+
+    <div id="settings-content" class="hidden space-y-8">
+      <div id="network-error-banner" class="hidden rounded-xl border border-amber-200 bg-amber-50 p-4">
+        <p class="text-fin-900">Cannot reach the API. Verify the endpoint is <code class="rounded bg-fin-code px-1 py-0.5 font-mono">https://data.finuties.com</code>.</p>
+        <a href="/disconnect" class="mt-2 inline-block text-sm text-fin-600 hover:underline">Disconnect</a>
+      </div>
+
+      <section>
+        <h1 class="text-2xl font-semibold text-fin-900">Settings</h1>
+        <p class="mt-1 text-fin-muted">Account balance, usage statistics, and billing information.</p>
+      </section>
+
+      <!-- Balance Card -->
+      <div class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 class="font-semibold text-fin-900 mb-4">Balance</h2>
+        <div id="balance-body" class="text-sm text-fin-muted">Loading…</div>
+      </div>
+
+      <!-- Tier Card -->
+      <div class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 class="font-semibold text-fin-900 mb-4">Your Tier</h2>
+        <div id="tier-body" class="text-sm text-fin-muted">Loading…</div>
+      </div>
+
+      <!-- Deposit Card -->
+      <div class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 class="font-semibold text-fin-900 mb-4">Deposit Tokens</h2>
+        <div class="space-y-4">
+          <div>
+            <label for="deposit-amount" class="block text-sm font-medium text-fin-900 mb-1">Amount (EUR)</label>
+            <input type="number" id="deposit-amount" min="1" max="100000" step="0.01" placeholder="10.00" class="w-full max-w-xs rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-fin-600 focus:ring-1 focus:ring-fin-600 focus:outline-none" />
+            <p id="deposit-preview" class="mt-1.5 text-sm text-fin-muted">EUR 10.00 = 100 tokens</p>
+          </div>
+          <div class="flex flex-wrap gap-3">
+            <button type="button" id="btn-deposit-stripe" class="rounded-lg bg-fin-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-fin-500 transition-colors disabled:opacity-50" disabled>
+              Deposit with Card
+            </button>
+            <button type="button" id="btn-deposit-coinbase" class="rounded-lg border border-fin-600 px-5 py-2.5 text-sm font-medium text-fin-600 hover:bg-fin-600/5 transition-colors disabled:opacity-50" disabled>
+              Deposit with Crypto
+            </button>
+          </div>
+          <p id="deposit-error" class="hidden text-sm text-red-600"></p>
+        </div>
+      </div>
+
+      <!-- Current Usage Cards -->
+      <div>
+        <h2 class="font-semibold text-fin-900 mb-4">Current Usage</h2>
+        <div class="grid gap-4 sm:grid-cols-3">
+          <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-sm font-medium text-fin-900">Today</span>
+              <button type="button" id="btn-period-day" class="text-xs text-fin-600 hover:underline">View</button>
+            </div>
+            <div id="usage-day-body" class="text-sm text-fin-muted">Loading…</div>
+          </div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-sm font-medium text-fin-900">This Week</span>
+              <button type="button" id="btn-period-week" class="text-xs text-fin-600 hover:underline">View</button>
+            </div>
+            <div id="usage-week-body" class="text-sm text-fin-muted">Loading…</div>
+          </div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-sm font-medium text-fin-900">This Month</span>
+              <button type="button" id="btn-period-month" class="text-xs text-fin-600 hover:underline">View</button>
+            </div>
+            <div id="usage-month-body" class="text-sm text-fin-muted">Loading…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Historical Usage Chart -->
+      <div class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="font-semibold text-fin-900">Usage History</h2>
+          <div class="flex items-center gap-2">
+            <input type="date" id="inp-from-date" class="rounded-lg border border-slate-300 px-2 py-1 text-sm" />
+            <span class="text-fin-muted">to</span>
+            <input type="date" id="inp-to-date" class="rounded-lg border border-slate-300 px-2 py-1 text-sm" />
+            <select id="sel-granularity" class="rounded-lg border border-slate-300 px-2 py-1 text-sm">
+              <option value="day">Daily</option>
+              <option value="week">Weekly</option>
+              <option value="month">Monthly</option>
+            </select>
+            <button type="button" id="btn-refresh-history" class="rounded-lg bg-fin-600 px-3 py-1 text-sm font-medium text-white hover:bg-fin-500 transition-colors">Refresh</button>
+          </div>
+        </div>
+        <div id="history-chart-mount" class="w-full" style="height:400px"></div>
+        <div id="history-summary" class="mt-4 text-sm text-fin-muted"></div>
+      </div>
+
+      <!-- Usage Log Table -->
+      <div class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="font-semibold text-fin-900">Usage Log</h2>
+          <div class="flex items-center gap-2">
+            <input type="date" id="inp-log-from-date" class="rounded-lg border border-slate-300 px-2 py-1 text-sm" />
+            <button type="button" id="btn-refresh-log" class="rounded-lg bg-fin-600 px-3 py-1 text-sm font-medium text-white hover:bg-fin-500 transition-colors">Refresh</button>
+          </div>
+        </div>
+        <div id="log-table-wrapper" class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-slate-200 text-sm">
+            <thead class="bg-slate-50">
+              <tr>
+                <th class="px-4 py-2 text-left font-medium text-fin-900">Timestamp</th>
+                <th class="px-4 py-2 text-left font-medium text-fin-900">Endpoint</th>
+                <th class="px-4 py-2 text-left font-medium text-fin-900">Method</th>
+                <th class="px-4 py-2 text-left font-medium text-fin-900">Domain</th>
+                <th class="px-4 py-2 text-left font-medium text-fin-900">Resource</th>
+                <th class="px-4 py-2 text-left font-medium text-fin-900">Source</th>
+                <th class="px-4 py-2 text-right font-medium text-fin-900">Tokens</th>
+                <th class="px-4 py-2 text-right font-medium text-fin-900">Duration</th>
+                <th class="px-4 py-2 text-right font-medium text-fin-900">Status</th>
+              </tr>
+            </thead>
+            <tbody id="log-table-body" class="divide-y divide-slate-200">
+              <tr>
+                <td colspan="9" class="px-4 py-4 text-center text-fin-muted">Loading…</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="log-pagination" class="mt-4 flex items-center justify-between text-sm">
+          <div id="log-info" class="text-fin-muted"></div>
+          <div class="flex items-center gap-2">
+            <button type="button" id="btn-log-prev" class="rounded-lg border border-slate-300 px-3 py-1 text-fin-muted hover:bg-slate-50 disabled:opacity-50" disabled>Previous</button>
+            <button type="button" id="btn-log-next" class="rounded-lg border border-slate-300 px-3 py-1 text-fin-muted hover:bg-slate-50 disabled:opacity-50" disabled>Next</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Local Cache Management -->
+      <div class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 class="font-semibold text-fin-900 mb-4">Local Cache</h2>
+        <p class="text-sm text-fin-muted mb-4">Manage locally stored card/plugin/analysis cache for this browser profile.</p>
+        <div id="cache-stats" class="text-sm text-fin-muted mb-4">Loading cache stats…</div>
+        <div class="flex flex-wrap gap-2">
+          <button type="button" id="btn-cache-clear-card" class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-fin-muted hover:bg-slate-50">Clear Card Cache</button>
+          <button type="button" id="btn-cache-clear-plugin" class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-fin-muted hover:bg-slate-50">Clear Plugin Cache</button>
+          <button type="button" id="btn-cache-clear-all" class="rounded-lg bg-rose-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-rose-500">Clear All Cache</button>
+        </div>
+        <p id="cache-action-msg" class="mt-3 hidden text-sm text-fin-muted"></p>
+      </div>
+
+      <!-- Account Information -->
+      <div class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 class="font-semibold text-fin-900 mb-4">Account Information</h2>
+        <div id="account-body" class="text-sm text-fin-muted">Loading…</div>
+      </div>
+    </div>
+
+    <div id="settings-error" class="hidden mx-auto max-w-md rounded-xl border border-amber-200 bg-amber-50 p-6">
+      <p id="settings-error-msg" class="text-fin-900"></p>
+      <a href="/disconnect" class="mt-4 inline-block text-sm text-fin-600 hover:underline">Disconnect</a>
+    </div>
+  </div>
+
+  <script>
+    import { getApiConfig, setApiConfig, apiFetch, isNetworkError } from '../../lib/api-client';
+    import { clearAllCaches, getCacheStats, invalidateByPrefix } from '../../lib/cache/cache-service';
+    import * as echarts from 'echarts';
+
+    function show(id: string) { document.getElementById(id)?.classList.remove('hidden'); }
+    function hide(id: string) { document.getElementById(id)?.classList.add('hidden'); }
+    function el(id: string): HTMLElement | null { return document.getElementById(id); }
+
+    function esc(s: string): string {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    function formatDate(d: string): string {
+      try {
+        return new Date(d).toLocaleString();
+      } catch {
+        return d;
+      }
+    }
+
+    function formatNumber(n: number): string {
+      return new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(n);
+    }
+
+    function formatBytes(bytes: number): string {
+      if (bytes < 1024) return `${bytes} B`;
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    }
+
+    function renderCacheStats() {
+      const mount = el('cache-stats');
+      if (!mount) return;
+      const stats = getCacheStats();
+      const prefixes = Object.entries(stats.byPrefix);
+      if (prefixes.length === 0) {
+        mount.innerHTML = '<p class="text-fin-muted">No local cache entries found.</p>';
+        return;
+      }
+      const rows = prefixes.map(([p, s]) => `<tr><td class="py-1 pr-4">${esc(p)}</td><td class="py-1 pr-4">${s.keyCount}</td><td class="py-1 text-right">${formatBytes(s.totalBytes)}</td></tr>`).join('');
+      mount.innerHTML = `
+        <div class="mb-2 text-fin-muted">Total keys: ${stats.keyCount} · Total size: ${formatBytes(stats.totalBytes)}</div>
+        <table class="text-xs text-fin-muted"><thead><tr><th class="text-left py-1 pr-4">Namespace</th><th class="text-left py-1 pr-4">Keys</th><th class="text-right py-1">Size</th></tr></thead><tbody>${rows}</tbody></table>
+      `;
+    }
+
+    // Medal badge color mapping
+    function medalBadge(medal: string | null): string {
+      if (!medal) return '<span class="text-fin-muted">&mdash;</span>';
+      const colors: Record<string, string> = {
+        'Bronze': 'bg-amber-700/10 text-amber-800',
+        'Silver': 'bg-slate-200/60 text-slate-700',
+        'Gold': 'bg-yellow-400/20 text-yellow-700',
+        'Platinum': 'bg-cyan-100/60 text-cyan-800',
+        'Diamond': 'bg-blue-100/60 text-blue-700',
+        'Obsidian': 'bg-slate-800/10 text-slate-900',
+        'Quantum': 'bg-purple-100/60 text-purple-700',
+      };
+      const cls = colors[medal] || 'bg-slate-100 text-slate-700';
+      return `<span class="inline-flex items-center rounded-full ${cls} px-2.5 py-0.5 text-xs font-medium">${esc(medal)}</span>`;
+    }
+
+    let historyChartInstance: echarts.ECharts | null = null;
+    let logOffset = 0;
+    const logLimit = 50;
+
+    // EUR per token (used for deposit preview)
+    const EUR_PER_TOKEN = 0.10;
+
+    // Initialize date inputs
+    const today = new Date();
+    const thirtyDaysAgo = new Date(today);
+    thirtyDaysAgo.setDate(today.getDate() - 30);
+    const fromDateInput = el('inp-from-date') as HTMLInputElement;
+    const toDateInput = el('inp-to-date') as HTMLInputElement;
+    if (fromDateInput) fromDateInput.value = thirtyDaysAgo.toISOString().slice(0, 10);
+    if (toDateInput) toDateInput.value = today.toISOString().slice(0, 10);
+
+    // Render balance
+    function renderBalance(data: { user?: { id?: string; username?: string; role?: string }; balance?: { tokens?: number; eur_value?: number; status?: string; updated_at?: string }; tier?: Record<string, unknown>; limits?: Record<string, unknown> } | null, err?: string) {
+      const b = el('balance-body');
+      if (!b) return;
+      if (err) {
+        b.innerHTML = `<p class="text-amber-700">${esc(err)}</p>`;
+        return;
+      }
+      if (!data) {
+        b.innerHTML = '<p>No data</p>';
+        return;
+      }
+      const bal = data.balance || {};
+      const tokens = bal.tokens ?? 0;
+      const eurValue = bal.eur_value ?? 0;
+      const status = bal.status || 'unknown';
+      const statusColor = status === 'healthy' ? 'text-green-600' : status === 'warning' ? 'text-amber-600' : 'text-red-600';
+      b.innerHTML = `
+        <div class="space-y-2">
+          <div class="flex items-baseline gap-2">
+            <span class="text-2xl font-semibold text-fin-900">${formatNumber(tokens)}</span>
+            <span class="text-fin-muted">tokens</span>
+          </div>
+          <div class="flex items-baseline gap-2">
+            <span class="text-xl font-medium text-fin-900">EUR ${formatNumber(eurValue)}</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-fin-muted">Status:</span>
+            <span class="${statusColor} font-medium capitalize">${esc(status)}</span>
+          </div>
+          ${bal.updated_at ? `<p class="text-xs text-fin-muted">Updated: ${formatDate(bal.updated_at)}</p>` : ''}
+        </div>
+      `;
+    }
+
+    // Render tier card
+    function renderTier(data: { tier?: { level?: number; name?: string; medal?: string | null; rate_limit_per_minute?: number; discount_percent?: number; next_tier?: { name?: string; medal?: string | null; tokens_needed?: number; monthly_consumed?: number } | null } } | null, err?: string) {
+      const b = el('tier-body');
+      if (!b) return;
+      if (err) {
+        b.innerHTML = `<p class="text-amber-700">${esc(err)}</p>`;
+        return;
+      }
+      if (!data || !data.tier) {
+        b.innerHTML = '<p>No tier data</p>';
+        return;
+      }
+      const t = data.tier;
+      const nxt = t.next_tier;
+      let progressHtml = '';
+      if (nxt) {
+        const consumed = nxt.monthly_consumed ?? 0;
+        const needed = nxt.tokens_needed ?? 0;
+        const target = consumed + needed;
+        const pct = target > 0 ? Math.min(100, Math.round((consumed / target) * 100)) : 0;
+        progressHtml = `
+          <div class="mt-4">
+            <div class="flex items-center justify-between text-xs text-fin-muted mb-1">
+              <span>${formatNumber(consumed)} tokens this month</span>
+              <span>${formatNumber(target)} to ${esc(nxt.name || 'next tier')}</span>
+            </div>
+            <div class="h-2 w-full rounded-full bg-slate-200 overflow-hidden">
+              <div class="h-full rounded-full bg-fin-600 transition-all" style="width:${pct}%"></div>
+            </div>
+            <p class="mt-1 text-xs text-fin-muted">${formatNumber(needed)} tokens remaining to reach <strong>${esc(nxt.name || 'next tier')}</strong></p>
+          </div>
+        `;
+      } else {
+        progressHtml = '<p class="mt-4 text-xs text-fin-muted">Maximum tier reached.</p>';
+      }
+
+      b.innerHTML = `
+        <div class="space-y-3">
+          <div class="flex items-center gap-3">
+            <span class="text-xl font-semibold text-fin-900">${esc(t.name || 'Recruit')}</span>
+            ${medalBadge(t.medal ?? null)}
+          </div>
+          <div class="flex flex-wrap gap-x-6 gap-y-1 text-sm text-fin-muted">
+            <span>Rate limit: <strong class="text-fin-900">${formatNumber(t.rate_limit_per_minute ?? 60)}/min</strong></span>
+            <span>Discount: <strong class="text-fin-900">${formatNumber(t.discount_percent ?? 0)}%</strong></span>
+          </div>
+          ${progressHtml}
+        </div>
+      `;
+    }
+
+    // Render current usage
+    function renderUsage(period: 'day' | 'week' | 'month', data: { period?: string; total_calls?: number; total_tokens?: number; total_cost_eur?: number; breakdown_by_endpoint?: Array<{ endpoint?: string; calls?: number; tokens?: number }>; breakdown_by_domain?: Array<{ domain?: string; calls?: number; tokens?: number }> } | null, err?: string) {
+      const bodyId = `usage-${period}-body`;
+      const b = el(bodyId);
+      if (!b) return;
+      if (err) {
+        b.innerHTML = `<p class="text-amber-700">${esc(err)}</p>`;
+        return;
+      }
+      if (!data) {
+        b.innerHTML = '<p>No data</p>';
+        return;
+      }
+      const calls = data.total_calls ?? 0;
+      const tokens = data.total_tokens ?? 0;
+      const cost = data.total_cost_eur ?? 0;
+      b.innerHTML = `
+        <div class="space-y-1">
+          <div><strong class="text-fin-900">${formatNumber(calls)}</strong> <span class="text-fin-muted">calls</span></div>
+          <div><strong class="text-fin-900">${formatNumber(tokens)}</strong> <span class="text-fin-muted">tokens</span></div>
+          <div><strong class="text-fin-900">EUR ${formatNumber(cost)}</strong></div>
+        </div>
+      `;
+    }
+
+    // Render history chart
+    function renderHistoryChart(data: { period?: { from?: string; to?: string }; granularity?: string; data?: Array<{ date?: string; calls?: number; tokens?: number; cost_eur?: number }>; summary?: { total_calls?: number; total_tokens?: number; total_cost_eur?: number; avg_daily_calls?: number; peak_day?: { date?: string; calls?: number } | null } } | null, err?: string) {
+      const mount = el('history-chart-mount');
+      const summary = el('history-summary');
+      if (!mount) return;
+      if (err) {
+        mount.innerHTML = `<p class="text-amber-700 p-4">${esc(err)}</p>`;
+        if (summary) summary.textContent = '';
+        return;
+      }
+      if (!data || !data.data || data.data.length === 0) {
+        mount.innerHTML = '<p class="text-fin-muted p-4">No data available for the selected period.</p>';
+        if (summary) summary.textContent = '';
+        return;
+      }
+
+      if (!historyChartInstance) {
+        historyChartInstance = echarts.init(mount);
+      }
+
+      const dates = data.data.map((d) => d.date || '');
+      const calls = data.data.map((d) => d.calls ?? 0);
+      const tokens = data.data.map((d) => d.tokens ?? 0);
+      const costs = data.data.map((d) => d.cost_eur ?? 0);
+
+      historyChartInstance.setOption({
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: { type: 'cross' },
+        },
+        legend: {
+          data: ['Calls', 'Tokens', 'Cost (EUR)'],
+          top: 10,
+        },
+        grid: { left: 60, right: 40, top: 60, bottom: 60 },
+        xAxis: {
+          type: 'category',
+          data: dates,
+          axisLabel: { rotate: 45 },
+        },
+        yAxis: [
+          { type: 'value', name: 'Calls / Tokens', position: 'left' },
+          { type: 'value', name: 'Cost (EUR)', position: 'right' },
+        ],
+        series: [
+          {
+            name: 'Calls',
+            type: 'line',
+            data: calls,
+            itemStyle: { color: '#2563eb' },
+            yAxisIndex: 0,
+          },
+          {
+            name: 'Tokens',
+            type: 'line',
+            data: tokens,
+            itemStyle: { color: '#10b981' },
+            yAxisIndex: 0,
+          },
+          {
+            name: 'Cost (EUR)',
+            type: 'line',
+            data: costs,
+            itemStyle: { color: '#f59e0b' },
+            yAxisIndex: 1,
+          },
+        ],
+      });
+
+      if (summary && data.summary) {
+        const s = data.summary;
+        const parts: string[] = [];
+        if (s.total_calls != null) parts.push(`Total calls: ${formatNumber(s.total_calls)}`);
+        if (s.total_tokens != null) parts.push(`Total tokens: ${formatNumber(s.total_tokens)}`);
+        if (s.total_cost_eur != null) parts.push(`Total cost: EUR ${formatNumber(s.total_cost_eur)}`);
+        if (s.avg_daily_calls != null) parts.push(`Avg daily: ${formatNumber(s.avg_daily_calls)}`);
+        if (s.peak_day) parts.push(`Peak: ${s.peak_day.date} (${formatNumber(s.peak_day.calls)} calls)`);
+        summary.textContent = parts.join(' \u2022 ');
+      }
+    }
+
+    // Render usage log
+    function renderUsageLog(data: { items?: Array<{ timestamp?: string; endpoint?: string; method?: string; domain?: string; resource?: string; tokens?: number; source?: string; response_size_bytes?: number; duration_ms?: number; status_code?: number }>; total?: number; limit?: number; offset?: number } | null, err?: string) {
+      const body = el('log-table-body');
+      const info = el('log-info');
+      const prevBtn = el('btn-log-prev') as HTMLButtonElement;
+      const nextBtn = el('btn-log-next') as HTMLButtonElement;
+      if (!body) return;
+      if (err) {
+        body.innerHTML = `<tr><td colspan="9" class="px-4 py-4 text-center text-amber-700">${esc(err)}</td></tr>`;
+        if (info) info.textContent = '';
+        if (prevBtn) prevBtn.disabled = true;
+        if (nextBtn) nextBtn.disabled = true;
+        return;
+      }
+      if (!data || !data.items || data.items.length === 0) {
+        body.innerHTML = '<tr><td colspan="9" class="px-4 py-4 text-center text-fin-muted">No log entries found.</td></tr>';
+        if (info) info.textContent = 'No entries';
+        if (prevBtn) prevBtn.disabled = true;
+        if (nextBtn) nextBtn.disabled = true;
+        return;
+      }
+
+      const items = data.items;
+      const total = data.total ?? 0;
+      const offset = data.offset ?? 0;
+      const limit = data.limit ?? logLimit;
+
+      body.innerHTML = items.map((item) => `
+        <tr class="hover:bg-slate-50">
+          <td class="px-4 py-2 text-fin-900">${esc(formatDate(item.timestamp || ''))}</td>
+          <td class="px-4 py-2 text-fin-900 font-mono text-xs">${esc(item.endpoint || '\u2014')}</td>
+          <td class="px-4 py-2 text-fin-900"><span class="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${item.method === 'GET' ? 'bg-blue-100 text-blue-800' : item.method === 'POST' ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-800'}">${esc(item.method || '\u2014')}</span></td>
+          <td class="px-4 py-2 text-fin-900">${esc(item.domain || '\u2014')}</td>
+          <td class="px-4 py-2 text-fin-900">${esc(item.resource || '\u2014')}</td>
+          <td class="px-4 py-2 text-fin-900"><span class="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${item.source === 'terminal' ? 'bg-purple-100 text-purple-800' : item.source === 'mcp' ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-700'}">${esc(item.source || 'api')}</span></td>
+          <td class="px-4 py-2 text-right text-fin-900">${formatNumber(item.tokens ?? 0)}</td>
+          <td class="px-4 py-2 text-right text-fin-900">${formatNumber(item.duration_ms ?? 0)} ms</td>
+          <td class="px-4 py-2 text-right"><span class="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${(item.status_code ?? 0) >= 200 && (item.status_code ?? 0) < 300 ? 'bg-green-100 text-green-800' : (item.status_code ?? 0) >= 400 ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-800'}">${item.status_code ?? '\u2014'}</span></td>
+        </tr>
+      `).join('');
+
+      if (info) {
+        info.textContent = `Showing ${offset + 1}\u2013${Math.min(offset + limit, total)} of ${formatNumber(total)} entries`;
+      }
+      if (prevBtn) prevBtn.disabled = offset <= 0;
+      if (nextBtn) nextBtn.disabled = offset + limit >= total;
+    }
+
+    // Render account info
+    function renderAccount(data: { user?: { id?: string; username?: string; role?: string }; tier?: { level?: number; name?: string; medal?: string | null; rate_limit_per_minute?: number; discount_percent?: number; next_tier?: { name?: string; monthly_consumed?: number } | null }; balance?: Record<string, unknown>; limits?: { credit_limit?: number | null; rate_limit_per_minute?: number; quota_period?: string; quota_reset_at?: string } } | null, err?: string) {
+      const b = el('account-body');
+      if (!b) return;
+      if (err) {
+        b.innerHTML = `<p class="text-amber-700">${esc(err)}</p>`;
+        return;
+      }
+      if (!data) {
+        b.innerHTML = '<p>No data</p>';
+        return;
+      }
+      const user = data.user || {};
+      const tier = data.tier || {};
+      const limits = data.limits || {};
+      b.innerHTML = `
+        <div class="space-y-3">
+          <div>
+            <span class="font-medium text-fin-900">User ID:</span>
+            <span class="ml-2 text-fin-muted">${esc(String(user.id || '\u2014'))}</span>
+          </div>
+          <div>
+            <span class="font-medium text-fin-900">Username:</span>
+            <span class="ml-2 text-fin-muted">${esc(String(user.username || '\u2014'))}</span>
+          </div>
+          <div>
+            <span class="font-medium text-fin-900">Role:</span>
+            <span class="ml-2 text-fin-muted">${esc(String(user.role || '\u2014'))}</span>
+          </div>
+          <div>
+            <span class="font-medium text-fin-900">Tier:</span>
+            <span class="ml-2">${esc(String(tier.name || 'Recruit'))} ${medalBadge(tier.medal ?? null)}</span>
+          </div>
+          <div>
+            <span class="font-medium text-fin-900">Discount:</span>
+            <span class="ml-2 text-fin-muted">${formatNumber(tier.discount_percent ?? 0)}%</span>
+          </div>
+          <div>
+            <span class="font-medium text-fin-900">Rate Limit:</span>
+            <span class="ml-2 text-fin-muted">${formatNumber(tier.rate_limit_per_minute ?? limits.rate_limit_per_minute ?? 60)} requests/minute</span>
+          </div>
+          ${tier.next_tier ? `
+          <div>
+            <span class="font-medium text-fin-900">Monthly Usage:</span>
+            <span class="ml-2 text-fin-muted">${formatNumber(tier.next_tier.monthly_consumed ?? 0)} tokens</span>
+          </div>
+          ` : ''}
+          <div>
+            <span class="font-medium text-fin-900">Quota Period:</span>
+            <span class="ml-2 text-fin-muted">${esc(String(limits.quota_period || '\u2014'))}</span>
+          </div>
+          ${limits.quota_reset_at ? `
+          <div>
+            <span class="font-medium text-fin-900">Quota Reset:</span>
+            <span class="ml-2 text-fin-muted">${formatDate(limits.quota_reset_at)}</span>
+          </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    // Deposit logic
+    function setupDeposit() {
+      const amountInput = el('deposit-amount') as HTMLInputElement;
+      const preview = el('deposit-preview');
+      const stripeBtn = el('btn-deposit-stripe') as HTMLButtonElement;
+      const coinbaseBtn = el('btn-deposit-coinbase') as HTMLButtonElement;
+      const errorEl = el('deposit-error');
+
+      if (!amountInput) return;
+
+      function updatePreview() {
+        const val = parseFloat(amountInput.value) || 0;
+        const tokens = val > 0 ? Math.floor(val / EUR_PER_TOKEN) : 0;
+        if (preview) preview.textContent = `EUR ${val.toFixed(2)} = ${formatNumber(tokens)} tokens`;
+        if (stripeBtn) stripeBtn.disabled = val <= 0;
+        if (coinbaseBtn) coinbaseBtn.disabled = val <= 0;
+      }
+
+      amountInput.addEventListener('input', updatePreview);
+      updatePreview();
+
+      async function deposit(provider: 'stripe' | 'coinbase') {
+        const amount = parseFloat(amountInput.value) || 0;
+        if (amount <= 0) return;
+        if (errorEl) { errorEl.textContent = ''; hide('deposit-error'); }
+        if (stripeBtn) stripeBtn.disabled = true;
+        if (coinbaseBtn) coinbaseBtn.disabled = true;
+
+        const endpoint = provider === 'stripe'
+          ? '/api/v1/payments/stripe/create-session'
+          : '/api/v1/payments/coinbase/create-charge';
+
+        const r = await apiFetch<{ checkout_url?: string }>(endpoint, {
+          method: 'POST',
+          body: JSON.stringify({ amount_eur: amount }),
+        });
+
+        if (r.error || !r.data?.checkout_url) {
+          if (errorEl) {
+            errorEl.textContent = r.error || 'Failed to create payment session.';
+            show('deposit-error');
+          }
+          if (stripeBtn) stripeBtn.disabled = false;
+          if (coinbaseBtn) coinbaseBtn.disabled = false;
+          return;
+        }
+
+        window.location.href = r.data.checkout_url;
+      }
+
+      stripeBtn?.addEventListener('click', () => deposit('stripe'));
+      coinbaseBtn?.addEventListener('click', () => deposit('coinbase'));
+    }
+
+    // Load all data
+    async function loadAll() {
+      const cfg = getApiConfig();
+      if (!cfg) {
+        show('connect-gate-wrapper');
+        hide('settings-content');
+        hide('settings-error');
+        return;
+      }
+
+      hide('connect-gate-wrapper');
+      show('settings-content');
+      hide('settings-error');
+      hide('network-error-banner');
+
+      let hasNetworkError = false;
+
+      // Load account
+      const accountR = await apiFetch<{ user?: { id?: string; username?: string; role?: string }; balance?: { tokens?: number; eur_value?: number; status?: string; updated_at?: string }; tier?: { level?: number; name?: string; medal?: string | null; rate_limit_per_minute?: number; discount_percent?: number; next_tier?: { name?: string; medal?: string | null; tokens_needed?: number; monthly_consumed?: number } | null }; limits?: Record<string, unknown> }>('/api/v1/account');
+      if (isNetworkError(accountR)) {
+        hasNetworkError = true;
+        show('network-error-banner');
+      } else if (accountR.status === 401) {
+        show('connect-gate-wrapper');
+        hide('settings-content');
+        return;
+      } else {
+        renderBalance(accountR.data || null, accountR.error);
+        renderTier(accountR.data || null, accountR.error);
+      }
+
+      // Load current usage
+      for (const period of ['day', 'week', 'month'] as const) {
+        const usageR = await apiFetch<{ period?: string; total_calls?: number; total_tokens?: number; total_cost_eur?: number; breakdown_by_endpoint?: Array<{ endpoint?: string; calls?: number; tokens?: number }>; breakdown_by_domain?: Array<{ domain?: string; calls?: number; tokens?: number }> }>(`/api/v1/account/usage/current?period=${period}`);
+        if (isNetworkError(usageR)) {
+          hasNetworkError = true;
+          show('network-error-banner');
+        } else {
+          renderUsage(period, usageR.data || null, usageR.error);
+        }
+      }
+
+      // Load history
+      await loadHistory();
+
+      // Load log
+      await loadLog();
+
+      // Render account info (reuse account data)
+      if (accountR.data) {
+        renderAccount(accountR.data, accountR.error);
+      }
+
+      // Setup deposit card
+      setupDeposit();
+      renderCacheStats();
+    }
+
+    // Load history
+    async function loadHistory() {
+      const fromInput = el('inp-from-date') as HTMLInputElement;
+      const toInput = el('inp-to-date') as HTMLInputElement;
+      const granularitySelect = el('sel-granularity') as HTMLSelectElement;
+      if (!fromInput || !toInput || !granularitySelect) return;
+
+      const fromDate = fromInput.value || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const toDate = toInput.value || new Date().toISOString().slice(0, 10);
+      const granularity = granularitySelect.value || 'day';
+
+      const historyR = await apiFetch<{ period?: { from?: string; to?: string }; granularity?: string; data?: Array<{ date?: string; calls?: number; tokens?: number; cost_eur?: number }>; summary?: { total_calls?: number; total_tokens?: number; total_cost_eur?: number; avg_daily_calls?: number; peak_day?: { date?: string; calls?: number } | null } }>(`/api/v1/account/usage/history?from_date=${encodeURIComponent(fromDate)}&to_date=${encodeURIComponent(toDate)}&granularity=${encodeURIComponent(granularity)}`);
+      if (isNetworkError(historyR)) {
+        show('network-error-banner');
+      } else {
+        renderHistoryChart(historyR.data || null, historyR.error);
+      }
+    }
+
+    // Load log
+    async function loadLog() {
+      const fromInput = el('inp-log-from-date') as HTMLInputElement;
+      const fromDate = fromInput?.value || undefined;
+
+      const params = new URLSearchParams({ limit: String(logLimit), offset: String(logOffset) });
+      if (fromDate) params.set('from_date', fromDate);
+
+      const logR = await apiFetch<{ items?: Array<{ timestamp?: string; endpoint?: string; method?: string; domain?: string; resource?: string; tokens?: number; source?: string; response_size_bytes?: number; duration_ms?: number; status_code?: number }>; total?: number; limit?: number; offset?: number }>(`/api/v1/account/usage/log?${params.toString()}`);
+      if (isNetworkError(logR)) {
+        show('network-error-banner');
+      } else {
+        renderUsageLog(logR.data || null, logR.error);
+      }
+    }
+
+    // Event listeners
+    const connectForm = el('connect-gate-wrapper')?.querySelector('form');
+    if (connectForm) {
+      connectForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const form = e.target as HTMLFormElement;
+        // Auto-detect API URL: use current origin if available, otherwise use placeholder/default
+        const currentOrigin = typeof window !== 'undefined' ? `${window.location.protocol}//${window.location.host}` : '';
+        const inputBase = (form.querySelector('[name="base"]') as HTMLInputElement);
+        const fallbackBase = currentOrigin || inputBase?.placeholder || 'https://data.finuties.com';
+        const base = inputBase?.value?.trim() || fallbackBase;
+        const token = (form.querySelector('[name="token"]') as HTMLInputElement)?.value?.trim() || '';
+        if (base && token) {
+          setApiConfig(base, token);
+          window.location.reload();
+        }
+      });
+    }
+
+    el('btn-refresh-history')?.addEventListener('click', loadHistory);
+    el('btn-refresh-log')?.addEventListener('click', () => { logOffset = 0; loadLog(); });
+    el('btn-log-prev')?.addEventListener('click', () => { logOffset = Math.max(0, logOffset - logLimit); loadLog(); });
+    el('btn-log-next')?.addEventListener('click', () => { logOffset += logLimit; loadLog(); });
+
+    // Period view buttons (for now, just refresh the current usage)
+    el('btn-period-day')?.addEventListener('click', async () => {
+      const r = await apiFetch('/api/v1/account/usage/current?period=day');
+      renderUsage('day', r.data || null, r.error);
+    });
+    el('btn-period-week')?.addEventListener('click', async () => {
+      const r = await apiFetch('/api/v1/account/usage/current?period=week');
+      renderUsage('week', r.data || null, r.error);
+    });
+    el('btn-period-month')?.addEventListener('click', async () => {
+      const r = await apiFetch('/api/v1/account/usage/current?period=month');
+      renderUsage('month', r.data || null, r.error);
+    });
+
+    function showCacheAction(msg: string) {
+      const action = el('cache-action-msg');
+      if (!action) return;
+      action.textContent = msg;
+      action.classList.remove('hidden');
+      setTimeout(() => action.classList.add('hidden'), 2500);
+    }
+
+    el('btn-cache-clear-card')?.addEventListener('click', () => {
+      const removed = invalidateByPrefix('card-cache:');
+      renderCacheStats();
+      showCacheAction(`Removed ${removed} card cache entries.`);
+    });
+
+    el('btn-cache-clear-plugin')?.addEventListener('click', () => {
+      const removed = invalidateByPrefix('plugin-cache:');
+      renderCacheStats();
+      showCacheAction(`Removed ${removed} plugin cache entries.`);
+    });
+
+    el('btn-cache-clear-all')?.addEventListener('click', () => {
+      const ok = window.confirm('Delete all local cached data for cards/plugins/analytics?');
+      if (!ok) return;
+      const removed = clearAllCaches();
+      renderCacheStats();
+      showCacheAction(`Removed ${removed} total cache entries.`);
+    });
+
+    // Initial load
+    loadAll();
+  </script>
+</DashboardLayout>

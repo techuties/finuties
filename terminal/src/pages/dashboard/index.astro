@@ -1,0 +1,893 @@
+---
+import DashboardLayout from '../../layouts/DashboardLayout.astro';
+---
+
+<DashboardLayout
+  title="Dashboard — FinUties"
+  description="FinUties terminal dashboard: breaking alerts, world events, macro pulse, energy markets, FX rates, crypto prices, Treasury yields, Fed rates, food prices, COT sentiment, geopolitical risk, sanctions, SEC filings, insider activity, institutional flow, and more."
+  active="dashboard"
+>
+  <!-- Auth gate: centralized API key policy -->
+  <script>
+    import { enforceApiKeySession } from '../../lib/auth/bootstrap';
+    import { getDefaultApiBase } from '../../lib/api-client';
+
+    enforceApiKeySession({
+      defaultBase: getDefaultApiBase(),
+      redirectTo: '/?apikey=1',
+      logPrefix: 'dashboard-auth',
+    });
+  </script>
+
+  <!-- Notification banner (Terminal API key auto-created) -->
+  <div id="key-banner" class="hidden">
+    <div class="bg-fin-600/10 border-b border-fin-800 px-4 py-2.5 sm:px-6">
+      <div class="flex items-center justify-between gap-4 text-sm">
+        <p id="key-banner-msg" class="text-fin-400 font-medium"></p>
+        <button id="key-banner-close" type="button" class="text-slate-400 hover:text-white transition-colors" aria-label="Dismiss">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+    </div>
+      </div>
+
+  <!-- Dashboard top bar -->
+  <div class="border-b border-fin-800 bg-fin-900/60 backdrop-blur px-4 py-2.5 sm:px-6 relative z-10">
+    <div class="flex items-center justify-between gap-3">
+      <!-- Left: user info + credits -->
+      <div class="flex items-center gap-4 min-w-0">
+        <div class="min-w-0">
+          <p id="user-info" class="text-sm font-medium text-slate-200 truncate">Dashboard</p>
+        </div>
+        <div id="credits-badge" class="hidden items-center gap-1.5 rounded-full border border-fin-800 bg-fin-900/80 px-2.5 py-1 text-xs font-mono flex-shrink-0">
+          <svg class="w-3 h-3 text-fin-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
+          <span id="credits-value" class="text-slate-200 font-medium">—</span>
+          <span class="text-slate-500">tokens</span>
+        </div>
+      </div>
+      <!-- Right: retry all + add button -->
+      <div class="relative flex-shrink-0 flex items-center gap-2">
+        <div id="persona-toggle" class="inline-flex items-center rounded-full border border-fin-800 bg-fin-900/80 p-0.5" title="Dashboard mode">
+          <button id="persona-executive" type="button" class="rounded-full px-2.5 py-1 text-xs text-slate-300 transition-colors" title="Executive mode" aria-pressed="false">Executive</button>
+          <button id="persona-trader" type="button" class="rounded-full px-2.5 py-1 text-xs text-slate-300 transition-colors" title="Trader mode" aria-pressed="true">Trader</button>
+        </div>
+        <button id="retry-all-btn" type="button" class="hidden items-center gap-1 rounded-full border border-amber-700/40 bg-amber-900/30 px-3 py-1.5 text-xs font-medium text-amber-400 hover:bg-amber-900/50 active:scale-95 transition-all" title="Retry all failed cards">Retry all</button>
+        <button id="add-card-btn" type="button" class="inline-flex items-center justify-center w-9 h-9 rounded-full bg-fin-600 text-white hover:bg-fin-500 active:scale-95 transition-all shadow-sm" title="Add module" aria-label="Add module">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" /></svg>
+        </button>
+        <!-- Module dropdown -->
+        <div id="add-card-menu" class="hidden absolute right-0 top-full mt-2 w-80 rounded-xl border border-fin-800 bg-fin-900 shadow-2xl z-50 overflow-hidden">
+          <div class="px-4 py-2.5 border-b border-fin-800 bg-fin-900/80">
+            <p class="text-xs font-semibold text-slate-300 uppercase tracking-wider">Available Modules</p>
+          </div>
+          <div id="add-card-list" class="max-h-80 overflow-y-auto py-1">
+            <!-- Populated by JS -->
+        </div>
+        </div>
+        </div>
+      </div>
+    </div>
+
+  <!-- Card grid (masonry via CSS columns) -->
+  <div id="card-grid" class="p-4 sm:p-6" style="column-count:3;column-gap:1.5rem;">
+    <!-- Cards rendered by JS -->
+    </div>
+
+  <!-- Empty state -->
+  <div id="empty-state" class="hidden px-4 py-20 text-center">
+    <svg class="mx-auto w-12 h-12 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>
+    <p class="mt-4 text-slate-400 font-medium">No cards on your dashboard</p>
+    <p class="mt-1 text-sm text-slate-500">Click the + button to get started.</p>
+  </div>
+
+  <!-- Responsive masonry breakpoints -->
+  <style>
+    #card-grid > * {
+      break-inside: avoid;
+      margin-bottom: 1.5rem;
+      display: inline-block;
+      width: 100%;
+    }
+    @media (max-width: 1024px) { #card-grid { column-count: 2 !important; } }
+    @media (max-width: 640px)  { #card-grid { column-count: 1 !important; } }
+    .fin-scroll {
+      scrollbar-width: thin;
+      scrollbar-color: #334155 transparent;
+    }
+    .fin-scroll::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    .fin-scroll::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .fin-scroll::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 9999px;
+      border: 2px solid transparent;
+      background-clip: content-box;
+    }
+    .fin-scroll::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+      background-clip: content-box;
+    }
+    /* Dot grid background */
+    main {
+      background-image: radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+  </style>
+
+  <script>
+    // ── Import card definitions (side-effect: registers them) ──
+    import '../../lib/cards/alerts-card';
+    import '../../lib/cards/world-events-card';
+    import '../../lib/cards/econ-calendar-card';
+    import '../../lib/cards/macro-pulse-card';
+    import '../../lib/cards/energy-card';
+    import '../../lib/cards/fx-rates-card';
+    import '../../lib/cards/crypto-prices-card';
+    import '../../lib/cards/treasury-yields-card';
+    import '../../lib/cards/fed-rates-card';
+    import '../../lib/cards/food-prices-card';
+    import '../../lib/cards/cot-sentiment-card';
+    import '../../lib/cards/geopolitical-risk-card';
+    import '../../lib/cards/sanctions-card';
+    import '../../lib/cards/insider-transactions-card';
+    import '../../lib/cards/sec-filings-card';
+    import '../../lib/cards/top-invested-card';
+    import '../../lib/cards/latest-investments-card';
+    import '../../lib/cards/treasury-debt-card';
+    import '../../lib/cards/trade-maritime-card';
+    import '../../lib/cards/imf-outlook-card';
+    import '../../lib/cards/commodities-card';
+    import '../../lib/cards/climate-monitor-card';
+    import '../../lib/cards/development-card';
+    import { loadBuiltinPlugins } from '../../lib/plugins/loader';
+    import { initBuiltInStrategies } from '../../lib/algorithms';
+
+    import { getApiConfig, clearApiConfig, apiFetch } from '../../lib/api-client';
+    import { isApiKeyToken } from '../../lib/auth/bootstrap';
+    import { ensureTerminalKey } from '../../lib/terminal-key';
+    import {
+      type CardInstance,
+      type CardSize,
+      type ViewType,
+      loadLayout,
+      saveLayout,
+      defaultLayout,
+      allCardDefs,
+      getCardDef,
+      newCardId,
+    } from '../../lib/card-registry';
+    import {
+      getCachedData,
+      getStaleCachedData,
+      setCachedData,
+      invalidateCard,
+      getCacheFetchedAt,
+    } from '../../lib/card-cache';
+    import { VIEW_ICONS, esc } from '../../lib/view-renderers';
+
+    // Community plugin hooks (cards are registered into the same runtime registry).
+    loadBuiltinPlugins();
+    initBuiltInStrategies();
+
+    // ── Helpers ──
+
+    function show(id: string) { document.getElementById(id)?.classList.remove('hidden'); }
+    function hide(id: string) { document.getElementById(id)?.classList.add('hidden'); }
+    function el(id: string) { return document.getElementById(id); }
+
+    // ── State ──
+
+    let layout: CardInstance[] = [];
+    type DashboardPersona = 'executive' | 'trader';
+    const PERSONA_KEY = 'dashboard-persona-v1';
+    const EXEC_LAYOUT_KEY = 'dashboard-layout-v4:executive';
+    const cardTokenCosts = new Map<string, number>();
+    const cardCleanups = new Map<string, () => void>();
+    const cardDataCache = new Map<string, import('../../lib/card-registry').CardData>();
+    const cardRetryCount = new Map<string, number>();
+    const failedCards = new Set<string>();
+    let draggedId: string | null = null;
+    let persona: DashboardPersona = loadPersona();
+
+    const MAX_AUTO_RETRIES = 2;
+    const RETRY_DELAYS = [3_000, 9_000]; // exponential backoff delays
+
+    function loadPersona(): DashboardPersona {
+      try {
+        const raw = localStorage.getItem(PERSONA_KEY);
+        return raw === 'executive' ? 'executive' : 'trader';
+      } catch {
+        return 'trader';
+      }
+    }
+
+    function savePersona(next: DashboardPersona): void {
+      try { localStorage.setItem(PERSONA_KEY, next); } catch {}
+    }
+
+    function loadActiveLayout(): CardInstance[] | null {
+      if (persona === 'trader') return loadLayout();
+      try {
+        const raw = localStorage.getItem(EXEC_LAYOUT_KEY);
+        return raw ? JSON.parse(raw) as CardInstance[] : null;
+      } catch {
+        return null;
+      }
+    }
+
+    function saveActiveLayout(nextLayout: CardInstance[]): void {
+      if (persona === 'trader') {
+        saveLayout(nextLayout);
+        return;
+      }
+      try { localStorage.setItem(EXEC_LAYOUT_KEY, JSON.stringify(nextLayout)); } catch {}
+    }
+
+    function defaultLayoutForPersona(nextPersona: DashboardPersona): CardInstance[] {
+      if (nextPersona === 'trader') return defaultLayout();
+      const preferred = ['alerts', 'world-events', 'macro-pulse', 'treasury-yields', 'fed-rates', 'sec-filings', 'econ-calendar', 'trade-maritime'];
+      const defs = allCardDefs();
+      const selected = preferred.map((t) => defs.find((d) => d.type === t)).filter((d): d is NonNullable<typeof d> => !!d);
+      return selected.map((def, i) => ({
+        id: newCardId(),
+        type: def.type,
+        position: i,
+        size: i < 2 ? 'lg' : def.defaultSize,
+      }));
+    }
+
+    function applyPersonaUi(): void {
+      const execBtn = el('persona-executive');
+      const traderBtn = el('persona-trader');
+      if (!execBtn || !traderBtn) return;
+      const isExec = persona === 'executive';
+      execBtn.className = 'rounded-full px-2.5 py-1 text-xs transition-colors ' + (isExec ? 'bg-fin-600 text-white' : 'text-slate-300 hover:bg-fin-800');
+      traderBtn.className = 'rounded-full px-2.5 py-1 text-xs transition-colors ' + (!isExec ? 'bg-fin-600 text-white' : 'text-slate-300 hover:bg-fin-800');
+      execBtn.setAttribute('aria-pressed', isExec ? 'true' : 'false');
+      traderBtn.setAttribute('aria-pressed', !isExec ? 'true' : 'false');
+    }
+
+    function applyGridDensity(): void {
+      const grid = el('card-grid');
+      if (!grid) return;
+      // Keep media query overrides for tablet/mobile; this is desktop default density.
+      grid.style.columnCount = persona === 'executive' ? '2' : '3';
+    }
+
+    // ── Size helpers (masonry: lg/full use column-span) ──
+
+    function applySize(card: HTMLElement, size: CardSize): void {
+      if (size === 'lg' || size === 'full') {
+        card.style.columnSpan = 'all';
+      } else {
+        card.style.columnSpan = '';
+      }
+    }
+
+    function nextSize(size: CardSize): CardSize {
+      const order: CardSize[] = ['sm', 'md', 'lg', 'full'];
+      const idx = order.indexOf(size);
+      return order[(idx + 1) % order.length];
+    }
+
+    // ── Badge / freshness helpers ──
+
+    function updateCostBadge(costEl: HTMLElement | null, tokenCost: number): void {
+      if (costEl) {
+        costEl.textContent = tokenCost > 0 ? `${tokenCost} tokens` : '0 tokens';
+      }
+    }
+
+    function formatTimeAgo(ms: number): string {
+      const seconds = Math.floor(ms / 1000);
+      if (seconds < 10) return 'just now';
+      if (seconds < 60) return `${seconds}s ago`;
+      const minutes = Math.floor(seconds / 60);
+      if (minutes < 60) return `${minutes}m ago`;
+      const hours = Math.floor(minutes / 60);
+      return `${hours}h ago`;
+    }
+
+    function updateFreshnessBadge(freshEl: HTMLElement | null, instanceId: string, type: string): void {
+      if (!freshEl) return;
+      const fetchedAt = getCacheFetchedAt(instanceId, type);
+      if (fetchedAt) {
+        const age = Date.now() - fetchedAt;
+        freshEl.textContent = age < 10_000 ? '\u00b7 just now' : `\u00b7 cached ${formatTimeAgo(age)}`;
+      } else {
+        freshEl.textContent = '';
+      }
+    }
+
+    function updateStatusBadge(statusEl: HTMLElement | null, status: 'live' | 'cached' | 'stale' | 'failed'): void {
+      if (!statusEl) return;
+      if (status === 'live') {
+        statusEl.textContent = 'live';
+        statusEl.className = 'card-status text-[10px] text-emerald-400';
+      } else if (status === 'cached') {
+        statusEl.textContent = 'cached';
+        statusEl.className = 'card-status text-[10px] text-slate-500';
+      } else if (status === 'stale') {
+        statusEl.textContent = 'stale';
+        statusEl.className = 'card-status text-[10px] text-amber-400';
+      } else {
+        statusEl.textContent = 'failed';
+        statusEl.className = 'card-status text-[10px] text-red-400';
+      }
+    }
+
+    function updateGlobalCredits(creditsRemaining: number | null | undefined): void {
+      if (creditsRemaining !== null && creditsRemaining !== undefined) {
+        const credBadge = el('credits-badge');
+        const credVal = el('credits-value');
+        if (credBadge && credVal) {
+          credVal.textContent = creditsRemaining.toLocaleString();
+          credBadge.classList.remove('hidden');
+          credBadge.classList.add('flex');
+        }
+      }
+    }
+
+    // ── View toggle HTML ──
+
+    function buildViewToggles(def: { views?: ViewType[] }, activeView: string): string {
+      const views = def.views;
+      if (!views || views.length <= 1) return '';
+      let html = '<div class="flex items-center gap-0.5 mr-1">';
+      for (const v of views) {
+        const active = v === activeView;
+        const cls = active
+          ? 'bg-fin-600 text-white'
+          : 'text-slate-500 hover:text-slate-300 hover:bg-fin-800/60';
+        html += `<button type="button" class="view-toggle p-1 rounded transition-colors ${cls}" data-view="${esc(v)}" title="${esc(v.charAt(0).toUpperCase() + v.slice(1))} view" aria-label="${esc(v)} view">`;
+        html += `<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">${(VIEW_ICONS as Record<string, string>)[v] || ''}</svg>`;
+        html += '</button>';
+      }
+      html += '</div>';
+      return html;
+    }
+
+    // ── Render a single card wrapper ──
+
+    function renderCardWrapper(instance: CardInstance): HTMLElement {
+      const def = getCardDef(instance.type);
+      const title = def?.title || instance.type;
+      const cost = cardTokenCosts.get(instance.id) || 0;
+      const activeView = instance.activeView || (def?.views?.[0]) || 'list';
+
+      const card = document.createElement('div');
+      card.id = `card-${instance.id}`;
+      card.className = 'rounded-xl border border-fin-800 bg-fin-900/80 backdrop-blur shadow-sm overflow-hidden transition-all hover:shadow-lg hover:border-fin-700';
+      card.draggable = true;
+
+      applySize(card, instance.size);
+
+      const viewToggleHtml = def ? buildViewToggles(def, activeView) : '';
+      const exploreLink = def?.exploreUrl
+        ? `<a href="${esc(def.exploreUrl)}" class="p-1 text-slate-500 hover:text-fin-400 transition-colors" title="Open in Explorer" aria-label="Open in Explorer"><svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg></a>`
+        : '';
+
+      card.innerHTML = `
+        <div class="flex items-center justify-between px-4 py-2.5 border-b border-fin-800 bg-gradient-to-r from-fin-900/70 to-fin-900/40 cursor-grab active:cursor-grabbing" data-drag-handle>
+          <div class="flex items-center gap-2 min-w-0">
+            <svg class="w-4 h-4 text-slate-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">${def?.icon || ''}</svg>
+            <h3 class="text-sm font-semibold text-slate-200 truncate">${esc(title)}</h3>
+          </div>
+          <div class="flex items-center gap-1 flex-shrink-0">
+            ${viewToggleHtml}
+            <span class="card-cost text-[10px] font-mono text-slate-500 bg-fin-800/60 rounded-full px-2 py-0.5" title="Tokens consumed">${cost > 0 ? cost + ' tokens' : '...'}</span>
+            <span class="card-status text-[10px] text-slate-500"></span>
+            <span class="card-freshness text-[10px] text-slate-600"></span>
+            ${exploreLink}
+            <button type="button" class="card-resize p-1 text-slate-500 hover:text-slate-300 transition-colors" title="Resize" aria-label="Resize card">
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" /></svg>
+            </button>
+            <button type="button" class="card-refresh p-1 text-slate-500 hover:text-slate-300 transition-colors" title="Refresh" aria-label="Refresh card">
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+            </button>
+            <button type="button" class="card-remove p-1 text-slate-500 hover:text-red-400 transition-colors" title="Remove" aria-label="Remove card">
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+        </div>
+        <div class="card-body p-4 text-sm text-slate-400">
+          <p class="animate-pulse">Loading...</p>
+        </div>
+      `;
+
+      // ── Event handlers ──
+
+      // View toggle
+      card.querySelectorAll('.view-toggle').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const newView = (btn as HTMLElement).dataset.view as ViewType;
+          if (!newView || !def) return;
+          const inst = layout.find((c) => c.id === instance.id);
+          if (inst) {
+            inst.activeView = newView;
+            saveActiveLayout(layout);
+          }
+          // Update toggle button styles
+          card.querySelectorAll('.view-toggle').forEach((b) => {
+            const isActive = (b as HTMLElement).dataset.view === newView;
+            b.classList.toggle('bg-fin-600', isActive);
+            b.classList.toggle('text-white', isActive);
+            b.classList.toggle('text-slate-500', !isActive);
+          });
+          // Cleanup previous view
+          const prevCleanup = cardCleanups.get(instance.id);
+          if (prevCleanup) { prevCleanup(); cardCleanups.delete(instance.id); }
+          // Re-render with new view
+          const cached = cardDataCache.get(instance.id);
+          if (cached) {
+            const body = card.querySelector('.card-body') as HTMLElement;
+            if (body) {
+              const cleanup = def.render(body, cached, newView);
+              if (cleanup) cardCleanups.set(instance.id, cleanup);
+            }
+          }
+        });
+      });
+
+      // Resize
+      card.querySelector('.card-resize')?.addEventListener('click', () => {
+        const inst = layout.find((c) => c.id === instance.id);
+        if (!inst) return;
+        inst.size = nextSize(inst.size);
+        saveActiveLayout(layout);
+        applySize(card, inst.size);
+      });
+
+      // Refresh
+      card.querySelector('.card-refresh')?.addEventListener('click', () => {
+        fetchAndRenderCard(instance.id, true);
+      });
+
+      // Remove
+      card.querySelector('.card-remove')?.addEventListener('click', () => {
+        const prevCleanup = cardCleanups.get(instance.id);
+        if (prevCleanup) { prevCleanup(); cardCleanups.delete(instance.id); }
+        failedCards.delete(instance.id);
+        cardRetryCount.delete(instance.id);
+        cardTokenCosts.delete(instance.id);
+        cardDataCache.delete(instance.id);
+        layout = layout.filter((c) => c.id !== instance.id);
+        layout.forEach((c, i) => c.position = i);
+        saveActiveLayout(layout);
+        invalidateCard(instance.id);
+        card.remove();
+        updateRetryAllButton();
+        if (layout.length === 0) {
+          el('card-grid')?.classList.add('hidden');
+          el('empty-state')?.classList.remove('hidden');
+        }
+      });
+
+      // Drag & Drop
+      card.addEventListener('dragstart', (e) => {
+        draggedId = instance.id;
+        card.classList.add('opacity-50');
+        e.dataTransfer?.setData('text/plain', instance.id);
+      });
+      card.addEventListener('dragend', () => {
+        draggedId = null;
+        card.classList.remove('opacity-50');
+      });
+      card.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        if (draggedId && draggedId !== instance.id) {
+          card.classList.add('ring-2', 'ring-fin-600/30');
+        }
+      });
+      card.addEventListener('dragleave', () => {
+        card.classList.remove('ring-2', 'ring-fin-600/30');
+      });
+      card.addEventListener('drop', (e) => {
+        e.preventDefault();
+        card.classList.remove('ring-2', 'ring-fin-600/30');
+        if (!draggedId || draggedId === instance.id) return;
+        const fromIdx = layout.findIndex((c) => c.id === draggedId);
+        const toIdx = layout.findIndex((c) => c.id === instance.id);
+        if (fromIdx >= 0 && toIdx >= 0) {
+          const [moved] = layout.splice(fromIdx, 1);
+          layout.splice(toIdx, 0, moved);
+          layout.forEach((c, i) => c.position = i);
+          saveActiveLayout(layout);
+          const grid = el('card-grid');
+          const fromEl = document.getElementById(`card-${moved.id}`);
+          if (grid && fromEl) {
+            if (fromIdx < toIdx) {
+              grid.insertBefore(fromEl, card.nextSibling);
+            } else {
+              grid.insertBefore(fromEl, card);
+            }
+          }
+        }
+      });
+
+      return card;
+    }
+
+    // ── Error display helper ──
+
+    function renderCardError(body: HTMLElement, instanceId: string, errorMsg: string): void {
+      failedCards.add(instanceId);
+      updateRetryAllButton();
+
+      body.innerHTML = `
+        <div class="flex flex-col items-center justify-center py-6 gap-2">
+          <svg class="w-8 h-8 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+          </svg>
+          <p class="text-sm text-slate-400">Could not load data</p>
+          <p class="text-xs text-slate-600 text-center px-4">${esc(errorMsg)}</p>
+          <button type="button" class="card-retry-btn mt-1 text-xs text-fin-400 hover:text-fin-300 underline underline-offset-2 transition-colors">Retry</button>
+        </div>
+      `;
+
+      body.querySelector('.card-retry-btn')?.addEventListener('click', () => {
+        cardRetryCount.delete(instanceId);
+        failedCards.delete(instanceId);
+        updateRetryAllButton();
+        fetchAndRenderCard(instanceId, true);
+      });
+    }
+
+    function updateRetryAllButton(): void {
+      const btn = el('retry-all-btn');
+      if (!btn) return;
+      if (failedCards.size > 0) {
+        btn.classList.remove('hidden');
+        btn.classList.add('inline-flex');
+        btn.textContent = `Retry all (${failedCards.size})`;
+      } else {
+        btn.classList.add('hidden');
+        btn.classList.remove('inline-flex');
+      }
+    }
+
+    // ── Fetch & render a single card (cache-aware, with retry) ──
+
+    async function fetchAndRenderCard(instanceId: string, forceRefresh = false): Promise<void> {
+      const inst = layout.find((c) => c.id === instanceId);
+      if (!inst) return;
+      const def = getCardDef(inst.type);
+      if (!def) return;
+
+      const cardEl = document.getElementById(`card-${instanceId}`);
+      const body = cardEl?.querySelector('.card-body') as HTMLElement | null;
+      const costEl = cardEl?.querySelector('.card-cost') as HTMLElement | null;
+      const statusEl = cardEl?.querySelector('.card-status') as HTMLElement | null;
+      const freshEl = cardEl?.querySelector('.card-freshness') as HTMLElement | null;
+      if (!body) return;
+
+      const ttl = def.cacheTtl ?? 300_000;
+      const activeView = (inst.activeView || def.views?.[0] || 'list') as ViewType;
+
+      // Cleanup previous render
+      const prevCleanup = cardCleanups.get(instanceId);
+      if (prevCleanup) { prevCleanup(); cardCleanups.delete(instanceId); }
+
+      // Try cache first (unless forced refresh or ttl=0)
+      if (!forceRefresh && ttl > 0) {
+        const cached = getCachedData(instanceId, inst.type, ttl);
+        if (cached) {
+          cardTokenCosts.set(instanceId, cached.tokenCost);
+          cardDataCache.set(instanceId, cached);
+          failedCards.delete(instanceId);
+          cardRetryCount.delete(instanceId);
+          updateRetryAllButton();
+          try {
+            const cleanup = def.render(body, cached, activeView);
+            if (cleanup) cardCleanups.set(instanceId, cleanup);
+          } catch (renderErr) {
+            console.error('[card:' + inst.type + '] render error (cached):', renderErr);
+            body.innerHTML = '<p class="text-red-400 text-xs py-4 text-center">Render error</p>';
+          }
+          updateCostBadge(costEl, cached.tokenCost);
+          updateStatusBadge(statusEl, 'cached');
+          updateFreshnessBadge(freshEl, instanceId, inst.type);
+          updateGlobalCredits(cached.creditsRemaining);
+          return;
+        }
+      }
+
+      // Cache miss or forced refresh: fetch from API
+      body.innerHTML = '<p class="text-slate-500 text-sm animate-pulse">Loading...</p>';
+
+      let data;
+      try {
+        data = await def.fetch();
+      } catch (err) {
+        const stale = getStaleCachedData(instanceId, inst.type);
+        if (stale) {
+          try {
+            const cleanup = def.render(body, stale, activeView);
+            if (cleanup) cardCleanups.set(instanceId, cleanup);
+          } catch (renderErr) {
+            console.error('[card:' + inst.type + '] render error (stale):', renderErr);
+            body.innerHTML = '<p class="text-red-400 text-xs py-4 text-center">Render error</p>';
+          }
+          updateCostBadge(costEl, stale.tokenCost);
+          updateStatusBadge(statusEl, 'stale');
+          updateFreshnessBadge(freshEl, instanceId, inst.type);
+          updateGlobalCredits(stale.creditsRemaining);
+          return;
+        }
+
+        const attempt = cardRetryCount.get(instanceId) ?? 0;
+        const errorMsg = err instanceof Error ? err.message : String(err);
+
+        if (attempt < MAX_AUTO_RETRIES) {
+          const delay = RETRY_DELAYS[attempt] ?? 9_000;
+          cardRetryCount.set(instanceId, attempt + 1);
+          updateStatusBadge(statusEl, 'failed');
+          body.innerHTML = `<p class="text-slate-500 text-xs animate-pulse">Retrying in ${Math.round(delay / 1000)}s...</p>`;
+          setTimeout(() => fetchAndRenderCard(instanceId, true), delay);
+        } else {
+          updateStatusBadge(statusEl, 'failed');
+          renderCardError(body, instanceId, errorMsg);
+        }
+        return;
+      }
+
+      cardRetryCount.delete(instanceId);
+      failedCards.delete(instanceId);
+      updateRetryAllButton();
+      if (ttl > 0) {
+        setCachedData(instanceId, inst.type, data, ttl);
+      }
+      cardTokenCosts.set(instanceId, data.tokenCost);
+      cardDataCache.set(instanceId, data);
+      try {
+        const cleanup = def.render(body, data, activeView);
+        if (cleanup) cardCleanups.set(instanceId, cleanup);
+      } catch (renderErr) {
+        console.error('[card:' + inst.type + '] render error:', renderErr);
+        body.innerHTML = '<p class="text-red-400 text-xs py-4 text-center">Render error</p>';
+      }
+      updateCostBadge(costEl, data.tokenCost);
+      updateStatusBadge(statusEl, 'live');
+      updateFreshnessBadge(freshEl, instanceId, inst.type);
+      updateGlobalCredits(data.creditsRemaining);
+    }
+
+    // ── Render the full grid ──
+
+    function renderGrid(): void {
+      const grid = el('card-grid');
+      const empty = el('empty-state');
+      if (!grid) return;
+      applyGridDensity();
+
+      for (const cleanup of cardCleanups.values()) { try { cleanup(); } catch {} }
+      cardCleanups.clear();
+
+      grid.innerHTML = '';
+
+      if (layout.length === 0) {
+        grid.classList.add('hidden');
+        empty?.classList.remove('hidden');
+        return;
+      }
+
+      grid.classList.remove('hidden');
+      empty?.classList.add('hidden');
+
+      layout.sort((a, b) => a.position - b.position);
+
+      for (const inst of layout) {
+        const cardEl = renderCardWrapper(inst);
+        grid.appendChild(cardEl);
+      }
+
+      Promise.allSettled(layout.map(inst => fetchAndRenderCard(inst.id))).then(results => {
+        for (const r of results) {
+          if (r.status === 'rejected') console.error('[dashboard] card error:', r.reason);
+        }
+      });
+    }
+
+    // ── Add Card menu ──
+
+    function buildAddCardMenu(): void {
+      const list = el('add-card-list');
+      if (!list) return;
+
+      const defs = allCardDefs();
+      list.innerHTML = defs.map((def) => `
+        <button type="button" class="add-card-option w-full text-left px-4 py-2.5 hover:bg-fin-800/60 transition-colors" data-type="${esc(def.type)}">
+          <div class="flex items-start gap-3">
+            <svg class="w-5 h-5 text-fin-500 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">${def.icon}</svg>
+            <div>
+              <p class="text-sm font-medium text-slate-200">${esc(def.title)}</p>
+              <p class="text-xs text-slate-500 mt-0.5">${esc(def.description)}</p>
+            </div>
+          </div>
+        </button>
+      `).join('');
+
+      list.querySelectorAll('.add-card-option').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const type = (btn as HTMLElement).dataset.type;
+          if (!type) return;
+          const def = getCardDef(type);
+          if (!def) return;
+
+          const inst: CardInstance = {
+            id: newCardId(),
+            type,
+            position: layout.length,
+            size: def.defaultSize,
+          };
+          layout.push(inst);
+          saveActiveLayout(layout);
+
+          const grid = el('card-grid');
+          if (grid) {
+            grid.classList.remove('hidden');
+            el('empty-state')?.classList.add('hidden');
+            const cardEl = renderCardWrapper(inst);
+            grid.appendChild(cardEl);
+            fetchAndRenderCard(inst.id);
+          }
+
+          el('add-card-menu')?.classList.add('hidden');
+        });
+      });
+    }
+
+    // ── Toggle add-card dropdown ──
+
+    el('add-card-btn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const menu = el('add-card-menu');
+      if (menu) menu.classList.toggle('hidden');
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        el('add-card-menu')?.classList.add('hidden');
+      }
+    });
+
+    document.addEventListener('click', () => {
+      el('add-card-menu')?.classList.add('hidden');
+    });
+
+    // ── Key banner dismiss ──
+
+    el('key-banner-close')?.addEventListener('click', () => {
+      hide('key-banner');
+    });
+
+    // ── Retry all failed cards ──
+
+    el('retry-all-btn')?.addEventListener('click', () => {
+      const ids = Array.from(failedCards);
+      for (const id of ids) {
+        cardRetryCount.delete(id);
+        failedCards.delete(id);
+      }
+      updateRetryAllButton();
+      for (const id of ids) {
+        fetchAndRenderCard(id, true);
+      }
+    });
+
+    function switchPersona(nextPersona: DashboardPersona): void {
+      if (persona === nextPersona) return;
+      saveActiveLayout(layout);
+      persona = nextPersona;
+      savePersona(nextPersona);
+      const saved = loadActiveLayout();
+      if (saved && saved.length > 0) {
+        layout = saved.filter((inst) => getCardDef(inst.type));
+        layout.forEach((c, i) => c.position = i);
+      } else {
+        layout = defaultLayoutForPersona(nextPersona);
+        saveActiveLayout(layout);
+      }
+      applyPersonaUi();
+      renderGrid();
+    }
+
+    el('persona-executive')?.addEventListener('click', () => switchPersona('executive'));
+    el('persona-trader')?.addEventListener('click', () => switchPersona('trader'));
+
+    // ── Main init ──
+
+    (async function init() {
+      try {
+      const config = getApiConfig();
+      if (!config) {
+          window.location.replace('/');
+        return;
+      }
+      if (!isApiKeyToken(config.token)) {
+        window.location.replace('/?apikey=1');
+        return;
+      }
+
+        const meRes = await apiFetch<{ username?: string; id?: string; role?: string; credits_remaining?: number }>('/api/v1/auth/me');
+        if (!meRes.ok) {
+          if (meRes.status === 401 || meRes.status === 403) {
+            clearApiConfig();
+            window.location.href = '/?expired=1';
+            return;
+          }
+          console.warn('[dashboard] /auth/me returned status', meRes.status);
+        }
+
+        const userEl = el('user-info');
+        if (userEl && meRes.data) {
+          userEl.textContent = `${meRes.data.username || meRes.data.id || 'User'} (${meRes.data.role || 'user'})`;
+        }
+
+        updateGlobalCredits(meRes.creditsRemaining ?? (meRes.data?.credits_remaining ?? null));
+
+        try {
+          const keyResult = await ensureTerminalKey();
+          if (keyResult.status === 'created') {
+            const banner = el('key-banner');
+            const bannerMsg = el('key-banner-msg');
+            if (banner && bannerMsg) {
+              bannerMsg.textContent = 'A "Terminal" API key has been created for your account. It will be used to track token usage for dashboard queries.';
+              banner.classList.remove('hidden');
+            }
+          } else if (keyResult.status === 'error') {
+            console.warn('Terminal key provisioning failed:', keyResult.error);
+          }
+        } catch (keyErr) {
+          console.warn('Terminal key provisioning failed:', keyErr);
+        }
+
+        try {
+          localStorage.removeItem('dashboard-layout-v2');
+          localStorage.removeItem('dashboard-layout-v3');
+          localStorage.removeItem('situation-cache-v1');
+          for (let i = localStorage.length - 1; i >= 0; i--) {
+            const k = localStorage.key(i);
+            if (k && k.startsWith('card-cache:') && /:(status|usage-credits|catalog|category-|data-sources|saved-analysis|cftc-seasonality|earthquake-monitor|global-situation):/.test(k)) {
+              localStorage.removeItem(k);
+            }
+          }
+        } catch {}
+
+        applyPersonaUi();
+
+        const saved = loadActiveLayout();
+        if (saved && saved.length > 0) {
+          layout = saved.filter((inst) => getCardDef(inst.type));
+          layout.forEach((c, i) => c.position = i);
+        }
+        if (layout.length === 0) {
+          layout = defaultLayoutForPersona(persona);
+          saveActiveLayout(layout);
+        }
+
+        buildAddCardMenu();
+        renderGrid();
+      } catch (err) {
+        console.error('Dashboard init failed:', err);
+        const grid = el('card-grid');
+        if (grid) {
+          grid.innerHTML = `
+            <div class="col-span-full flex flex-col items-center justify-center py-20 gap-3">
+              <svg class="w-12 h-12 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+              </svg>
+              <p class="text-slate-400 font-medium">Dashboard failed to load</p>
+              <p class="text-sm text-slate-500">${esc(err instanceof Error ? err.message : String(err))}</p>
+              <button onclick="location.reload()" class="mt-2 text-sm text-fin-400 hover:text-fin-300 underline">Reload page</button>
+            </div>
+          `;
+        }
+      }
+    })();
+  </script>
+</DashboardLayout>
