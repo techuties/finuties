@@ -32,7 +32,24 @@ flowchart TD
 
 ## Quick Start
 
-### Web Terminal
+### Web Terminal (Docker, cross-platform)
+Use this path on a freshly installed OS (macOS, Windows, Linux):
+1. Install Docker:
+   - macOS/Windows: Docker Desktop
+   - Linux: Docker Engine + Docker Compose plugin
+2. Clone this repository and enter the terminal app:
+   - `git clone https://github.com/techuties/finuties.git`
+   - `cd finuties/terminal`
+3. Start the terminal container:
+   - `docker compose up --build`
+4. Open `http://localhost:4321` and connect with your FinUties API key (`fin_sk_...`)
+5. Stop the stack when finished:
+   - `docker compose down`
+
+Setup walkthrough video:
+- `terminal/public/videos/setup-terminal-local-docker.mp4`
+
+### Web Terminal (Node.js, without Docker)
 1. `cd terminal`
 2. `npm install`
 3. `npm run dev`
