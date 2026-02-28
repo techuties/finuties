@@ -233,13 +233,12 @@ const ALLOW_NON_FINUTIES_API = import.meta.env.PUBLIC_ALLOW_NON_FINUTIES_API ===
 
           <div class="p-6 lg:p-8">
             <div class="rounded-lg border border-fin-800 bg-fin-950/40 px-4 py-3 text-xs text-fin-muted">
-              Community edition authentication is handled on <a href="https://www.finuties.com/login" class="text-fin-400 hover:text-fin-500">finuties.com</a>.
-              Use your FinUties API key to connect this local terminal.
+              API key authentication is the only sign-in method in Terminal Community.
+              Create or copy your key from <a href="https://www.finuties.com/settings" class="text-fin-400 hover:text-fin-500">FinUties Settings</a>, then connect below.
             </div>
 
-            <div class="mt-4 flex gap-2">
-              <a href="https://www.finuties.com/login" target="_blank" rel="noopener noreferrer" class="flex-1 text-center py-2.5 bg-fin-600 hover:bg-fin-500 text-white font-semibold rounded-lg transition-colors text-sm">Login on finuties.com</a>
-              <a href="https://www.finuties.com/settings" target="_blank" rel="noopener noreferrer" class="flex-1 text-center py-2.5 bg-fin-800 hover:bg-fin-700 text-white font-semibold rounded-lg transition-colors text-sm">Open API Keys</a>
+            <div class="mt-4">
+              <a href="https://www.finuties.com/settings" target="_blank" rel="noopener noreferrer" class="block w-full text-center py-2.5 bg-fin-800 hover:bg-fin-700 text-white font-semibold rounded-lg transition-colors text-sm">Open API Keys on finuties.com</a>
             </div>
 
             <form id="apikey-form" class="space-y-3" onsubmit="handleApiKeyConnect(event)">
@@ -257,11 +256,9 @@ const ALLOW_NON_FINUTIES_API = import.meta.env.PUBLIC_ALLOW_NON_FINUTIES_API ===
             </form>
 
             <p class="mt-4 text-center text-fin-muted text-sm">
-              New user? <a href="https://www.finuties.com/register" class="text-fin-400 hover:text-fin-500 font-medium transition-colors">Register</a>
-              · Already have an account? <a href="https://www.finuties.com/login" class="text-fin-400 hover:text-fin-500 font-medium transition-colors">Login</a>
-              · Manage keys in <a href="https://www.finuties.com/settings" class="text-fin-400 hover:text-fin-500 font-medium transition-colors">Settings</a>
+              Use a key that starts with <span class="font-mono text-fin-400">fin_sk_</span>. If needed, sign in on finuties.com to manage keys in <a href="https://www.finuties.com/settings" class="text-fin-400 hover:text-fin-500 font-medium transition-colors">Settings</a>.
             </p>
-            <p class="mt-2 text-center text-[11px] text-fin-muted">FinUites Terminal Community requires a valid FinUties API key to load user resources.</p>
+            <p class="mt-2 text-center text-[11px] text-fin-muted">FinUites Terminal Community only supports API key authentication.</p>
           </div>
         </div>
 

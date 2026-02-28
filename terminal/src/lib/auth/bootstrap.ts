@@ -1,5 +1,4 @@
 const STORAGE_KEY = 'finuties-api-config';
-const SESSION_COOKIE = 'fin_session';
 
 interface StoredConfig {
   base?: string;
@@ -7,7 +6,6 @@ interface StoredConfig {
 }
 
 interface SessionGuardOptions {
-  defaultBase: string;
   redirectTo?: string;
   logPrefix?: string;
 }
@@ -38,11 +36,6 @@ function normalizeBase(base: string | undefined, fallback: string): string {
   }
 }
 
-export function getSessionCookieToken(): string | null {
-  const m = document.cookie.match(new RegExp(`(?:^|;\\s*)${SESSION_COOKIE}=([^;]*)`));
-  return m ? decodeURIComponent(m[1]) : null;
-}
-
 export function isApiKeyToken(token: string | null | undefined): boolean {
   return typeof token === 'string' && token.trim().startsWith('fin_sk_');
 }
@@ -61,20 +54,13 @@ export function setStoredToken(base: string, token: string): void {
 }
 
 export function enforceApiKeySession(options: SessionGuardOptions): boolean {
-  const { defaultBase, redirectTo = '/?apikey=1', logPrefix = 'auth-guard' } = options;
-  const cookieToken = getSessionCookieToken();
+  const { redirectTo = '/?apikey=1', logPrefix = 'auth-guard' } = options;
   const localToken = getStoredToken();
-  const localBase = getStoredBase(defaultBase);
 
-  if (!cookieToken && localToken && !isApiKeyToken(localToken)) {
+  if (localToken && !isApiKeyToken(localToken)) {
     clearStoredConfig();
     window.location.replace(redirectTo);
     return false;
-  }
-
-  if (cookieToken && cookieToken !== localToken && isApiKeyToken(cookieToken)) {
-    writeStoredConfig(localBase, cookieToken);
-    return true;
   }
 
   if (localToken && isApiKeyToken(localToken)) {
