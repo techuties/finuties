@@ -10,10 +10,8 @@ import DashboardLayout from '../../layouts/DashboardLayout.astro';
   <!-- Auth gate: centralized API key policy -->
   <script>
   import { enforceApiKeySession } from '../../lib/auth/bootstrap';
-  import { getDefaultApiBase } from '../../lib/api-client';
 
   enforceApiKeySession({
-    defaultBase: getDefaultApiBase(),
     redirectTo: '/?apikey=1',
     logPrefix: 'explore-auth',
   });

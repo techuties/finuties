@@ -36,11 +36,21 @@ flowchart TD
 1. `cd terminal`
 2. `npm install`
 3. `npm run dev`
+4. Open the local terminal URL and connect with your FinUties API key (`fin_sk_...`)
+
+### Authentication
+- FinUites Terminal Community supports **API key authentication only**.
+- No username/password session login is available in the terminal UI.
+- Generate or manage keys in `https://www.finuties.com/settings` and paste the key on the terminal connect page.
 
 ### Notebooks
 1. Create `notebooks/.env` from `notebooks/.env.example`
-2. Install dependencies from `notebooks/requirements.txt`
-3. Run the notebooks in your preferred Jupyter environment to query and analyze data from the FinUties API
+2. Set `FINUTIES_API_KEY=fin_sk_...` in `notebooks/.env`
+3. Install dependencies:
+   - `python3 -m pip install -r notebooks/requirements.txt`
+4. Start Jupyter from the repository root (recommended) and open any notebook:
+   - `jupyter lab`
+5. Run cells top-to-bottom; each notebook expects the same `notebooks/.env` API key setup
 
 ## Notes
 
