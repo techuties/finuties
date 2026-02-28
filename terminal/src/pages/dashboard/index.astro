@@ -4,7 +4,7 @@ import DashboardLayout from '../../layouts/DashboardLayout.astro';
 
 <DashboardLayout
   title="Dashboard — FinUties"
-  description="FinUties terminal dashboard: breaking alerts, world events, macro pulse, energy markets, FX rates, crypto prices, Treasury yields, Fed rates, food prices, COT sentiment, geopolitical risk, sanctions, SEC filings, insider activity, institutional flow, and more."
+  description="FinUites Terminal Community dashboard: breaking alerts, world events, macro pulse, energy markets, FX rates, crypto prices, Treasury yields, Fed rates, food prices, COT sentiment, geopolitical risk, sanctions, SEC filings, insider activity, institutional flow, and more."
   active="dashboard"
 >
   <!-- Auth gate: centralized API key policy -->
@@ -19,7 +19,7 @@ import DashboardLayout from '../../layouts/DashboardLayout.astro';
     });
   </script>
 
-  <!-- Notification banner (Terminal API key auto-created) -->
+  <!-- Notification banner (Terminal Community API key auto-created) -->
   <div id="key-banner" class="hidden">
     <div class="bg-fin-600/10 border-b border-fin-800 px-4 py-2.5 sm:px-6">
       <div class="flex items-center justify-between gap-4 text-sm">
@@ -148,7 +148,7 @@ import DashboardLayout from '../../layouts/DashboardLayout.astro';
 
     import { getApiConfig, clearApiConfig, apiFetch } from '../../lib/api-client';
     import { isApiKeyToken } from '../../lib/auth/bootstrap';
-    import { ensureTerminalKey } from '../../lib/terminal-key';
+    import { ensureTerminalCommunityKey } from '../../lib/terminal-community-key';
     import {
       type CardInstance,
       type CardSize,
@@ -831,19 +831,19 @@ import DashboardLayout from '../../layouts/DashboardLayout.astro';
         updateGlobalCredits(meRes.creditsRemaining ?? (meRes.data?.credits_remaining ?? null));
 
         try {
-          const keyResult = await ensureTerminalKey();
+          const keyResult = await ensureTerminalCommunityKey();
           if (keyResult.status === 'created') {
             const banner = el('key-banner');
             const bannerMsg = el('key-banner-msg');
             if (banner && bannerMsg) {
-              bannerMsg.textContent = 'A "Terminal" API key has been created for your account. It will be used to track token usage for dashboard queries.';
+              bannerMsg.textContent = 'A "Terminal Community" API key has been created for your account. It will be used to track token usage for dashboard queries.';
               banner.classList.remove('hidden');
             }
           } else if (keyResult.status === 'error') {
-            console.warn('Terminal key provisioning failed:', keyResult.error);
+            console.warn('Terminal Community key provisioning failed:', keyResult.error);
           }
         } catch (keyErr) {
-          console.warn('Terminal key provisioning failed:', keyErr);
+          console.warn('Terminal Community key provisioning failed:', keyErr);
         }
 
         try {
