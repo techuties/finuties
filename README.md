@@ -22,8 +22,12 @@ A unified REST API for financial, economic, and alternative data — **108 resou
 FinUties aggregates data from SEC, World Bank, UNDP, FAO, WHO, GBIF, and dozens of other authoritative sources into a single, developer-friendly API. Query SEC filings, stock prices, macroeconomic indicators, climate data, conflict events, and more — all through one base URL with consistent pagination, filtering, and authentication.
 
 <p align="center">
-  <img src="assets/hero.png" alt="FinUties Quickstart Notebook" width="800" />
+  <a href="assets/demo.mp4">
+    <img src="assets/hero.png" alt="FinUties Quickstart Notebook — click to watch demo" width="800" />
+  </a>
 </p>
+
+> **Live demo** — The notebook executing step by step against the real API: setup, health check, resource catalog discovery, and error handling. [Watch the video](assets/demo.mp4)
 
 ---
 
@@ -273,7 +277,8 @@ print(f"Collected {len(df)} rows")
 ```
 finuties/
 ├── quickstart.ipynb   # Interactive quickstart notebook
-├── assets/            # Screenshots for documentation
+├── assets/            # Screenshots and demo video
+│   ├── demo.mp4
 │   ├── hero.png
 │   ├── health_check.png
 │   ├── resource_catalog.png
