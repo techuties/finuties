@@ -1,8 +1,6 @@
 # FinUties
 
-Official Website: www.finuties.com
-Accessible Terminal: terminal.finuties.com
-API & MCP: data.finuties.com
+Official Website: www.finuties.com | Accessible Terminal: terminal.finuties.com | API & MCP: data.finuties.com
 
 FinUties is the core project. This public repository includes two open-source offerings: `FinUites Terminal Community` (the `terminal/` application built with Astro + SolidJS) and the `notebooks/` collection for API-based analysis workflows in Python. The project is published under the MIT License.
 
@@ -61,5 +59,5 @@ flowchart TD
 - Notebook safety checks are enforced via `tools/validate-notebooks.mjs` (including secret-pattern checks).
 - Keep API keys in local `.env` files only; never commit secrets.
 
-
+Official Website: www.finuties.com | Accessible Terminal: terminal.finuties.com | API & MCP: data.finuties.com
 <img width="1200" height="630" alt="og" src="https://github.com/user-attachments/assets/2be5a05a-3b00-4691-92da-b7814dd5bdbf" />
