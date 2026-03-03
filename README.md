@@ -56,3 +56,6 @@ flowchart TD
 
 - Notebook safety checks are enforced via `tools/validate-notebooks.mjs` (including secret-pattern checks).
 - Keep API keys in local `.env` files only; never commit secrets.
+
+
+<img width="1200" height="630" alt="og" src="https://github.com/user-attachments/assets/2be5a05a-3b00-4691-92da-b7814dd5bdbf" />
