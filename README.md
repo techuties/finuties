@@ -1,5 +1,9 @@
 # FinUties
 
+Official Website: www.finuties.com
+Accessible Terminal: terminal.finuties.com
+API & MCP: data.finuties.com
+
 FinUties is the core project. This public repository includes two open-source offerings: `FinUites Terminal Community` (the `terminal/` application built with Astro + SolidJS) and the `notebooks/` collection for API-based analysis workflows in Python. The project is published under the MIT License.
 
 A hosted version is available and accessible online, so you can explore the platform without local setup. Visit `https://www.finuties.com` to access the live environment.
