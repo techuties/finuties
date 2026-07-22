@@ -1,6 +1,6 @@
 # New sources, endpoints, and scraping candidates
 
-Last checked: **2026-07-21**
+Last checked: **2026-07-22**
 
 This is the implementation backlog for upstream data not already represented in the FinUties source registry. It ranks stable, free, directly machine-readable sources above feeds that require registration, licensing review, or scraping.
 
@@ -36,14 +36,14 @@ These routes are already consumed somewhere in the client but are absent from th
 
 ## Added in this check
 
-- **ENTSOG Transparency Platform**, **California CEC MIDAS v2**, and **FIRST EPSS** are new P0 candidates.
-- **GB Carbon Intensity**, **NOAA CO-OPS**, **Aviation Weather Center**, and **eCFR** are new P1 candidates.
-- **IATI Datastore v3** is documented under P2 because its API requires a free subscription key.
-- The stale USAspending reference URL `/api/v2/references/agency/` returned HTTP 404. The working discovery URL is now `/api/v2/references/toptier_agencies/`.
+- **UK Find a Tender OCDS** and **World Bank Projects & Operations** are new P0 candidates: both returned bounded JSON without credentials and add procurement or development-finance data not present in the current registry.
+- **OECD Data Explorer**, the broader **ECB Data Portal**, **NASA POWER**, and **CPSC recalls** are new P1 candidates. They are directly accessible but overlap existing macro/climate coverage or are narrower in scope.
+- **AEMO NEMWeb** is documented under P2 despite anonymous file access because AEMO says the data is for information only and is not intended for commercial use.
+- The World Bank debarment list is added to the scraping queue. Its official table remains valuable, but a previously used undocumented `all.json` URL now returns the Operations Search HTML application rather than JSON.
 
 ## P0 — high value, implement next
 
-All P0 entry points returned HTTP 200 without credentials on 2026-07-21.
+All P0 entry points returned HTTP 200 without credentials on 2026-07-22.
 
 | Rank | Source and direct entry point | Coverage and value | Suggested FinUties route | Implementation notes |
 | ---: | --- | --- | --- | --- |
@@ -58,11 +58,13 @@ All P0 entry points returned HTTP 200 without credentials on 2026-07-21.
 | 9 | **ENTSOG Transparency Platform** — [sample physical-flow query](https://transparency.entsog.eu/api/v1/operationaldatas?indicator=Physical%20Flow&from=2026-07-20&to=2026-07-21&limit=1) | European gas nominations, allocations, physical flows, capacities, interruptions, gas quality, operators, and interconnection points. High-value energy-security and supply-disruption coverage. | `/api/v1/data/energy/european-gas-flows` | Public JSON/XML/CSV/XLSX API. Stay below six requests/minute, query bounded windows, use `pointDirection` and operator filters, and cache referential metadata. |
 | 10 | **California CEC MIDAS v2** — [active signal list](https://midasapi.energy.ca.gov/api/valuedata?SignalType=0) | Time-varying electricity rates, California Flex Alerts, and 5-minute marginal GHG signals. Version 2 made public GETs credential-free on 2026-06-22. | `/api/v1/data/energy/california-grid-signals` | Use `ID` plus `QueryType` for 72-hour realtime or 90-day windows and `/api/historicaldata/{rate_id}` for older ranges. Values are UTC; GHG units are now `g/kWh CO2`. |
 | 11 | **EU TED Search API** — [official documentation](https://docs.ted.europa.eu/api/latest/search.html) | EU procurement notices, buyers, suppliers, CPV sectors, values, deadlines, and awards. | `/api/v1/data/procurement/eu-ted` | Anonymous JSON POST to `/v3/notices/search`; use explicit fields and expert queries, paginate with iteration tokens, and separate awards from calls for tender. |
-| 12 | **Elexon Insights** — [current generation by fuel](https://data.elexon.co.uk/bmrs/api/v1/generation/outturn/current) | Great Britain generation, demand, imbalance prices, outages, forecasts, and REMIT events. | `/api/v1/data/energy/elexon` | Use the OpenAPI contract rather than scraping the portal; follow the BMRS Data Licence and API Terms. |
-| 13 | **USAspending.gov** — [current agency reference](https://api.usaspending.gov/api/v2/references/toptier_agencies/) | US federal contracts, grants, loans, recipients, agencies, places of performance, and transaction history. | `/api/v1/data/procurement/us-awards` | Advanced award search uses structured POST requests. Increment by action date, preserve award/recipient IDs, and distinguish obligations from potential award values. |
-| 14 | **CISA Known Exploited Vulnerabilities** — [official JSON](https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json) | Authoritative vulnerabilities confirmed as exploited in the wild. | `/api/v1/data/cyber/known-exploited` | Upsert the full snapshot by CVE and retain `dateAdded`, `dueDate`, ransomware status, and catalog version. |
-| 15 | **FIRST EPSS** — [public API](https://api.first.org/data/v1/epss?limit=1) | Daily 30-day exploitation probabilities and percentiles for CVEs. It prioritizes the broader vulnerability universe around CISA KEV. | `/api/v1/data/cyber/exploit-probability` | The API needs no authentication and allows 1,000 requests/minute, but is marked beta. Prefer the daily compressed CSV for full syncs; use the API for CVE batches and recent time series. |
-| 16 | **NASA EONET v3** — [open events](https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=200) | Near-real-time global wildfires, storms, volcanoes, floods, landslides, droughts, dust storms, and ice events with geometry. | `/api/v1/data/disasters/eonet` | Deduplicate overlap with GDACS by source ID and time/geometry. The endpoint currently labels its JSON body as `application/rss+xml`, so parse by content. |
+| 12 | **UK Find a Tender OCDS** — [recent release packages](https://www.find-tender.service.gov.uk/api/1.0/ocdsReleasePackages?limit=1&updatedFrom=2026-07-21T00%3A00%3A00) | UK procurement planning, tenders, awards, buyers, suppliers, CPV sectors, values, and contract periods. | `/api/v1/data/procurement/uk-tenders` | Public OCDS 1.1 JSON under OGL v3. Increment with `updatedFrom`/`updatedTo`, follow cursor links, and preserve `ocid`, release IDs, stages, and party IDs. Authentication documented for submission APIs is not required by this publication endpoint. |
+| 13 | **Elexon Insights** — [current generation by fuel](https://data.elexon.co.uk/bmrs/api/v1/generation/outturn/current) | Great Britain generation, demand, imbalance prices, outages, forecasts, and REMIT events. | `/api/v1/data/energy/elexon` | Use the OpenAPI contract rather than scraping the portal; follow the BMRS Data Licence and API Terms. |
+| 14 | **USAspending.gov** — [current agency reference](https://api.usaspending.gov/api/v2/references/toptier_agencies/) | US federal contracts, grants, loans, recipients, agencies, places of performance, and transaction history. | `/api/v1/data/procurement/us-awards` | Advanced award search uses structured POST requests. Increment by action date, preserve award/recipient IDs, and distinguish obligations from potential award values. |
+| 15 | **World Bank Projects & Operations** — [bounded projects query](https://search.worldbank.org/api/v2/projects?format=json&rows=1&fl=id%2Cproject_name%2Ccountryname%2Cstatus%2Ctotalamt%2Cboardapprovaldate) | Public records for active, pipeline, and closed World Bank lending projects from 1947 onward, including countries, sectors, commitments, status, and document links. | `/api/v1/data/development/projects` | Use an explicit field list and bounded `rows`/`os` pagination; upsert by project ID and retain commitment currency, approval dates, status, and links to contracts and documents. |
+| 16 | **CISA Known Exploited Vulnerabilities** — [official JSON](https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json) | Authoritative vulnerabilities confirmed as exploited in the wild. | `/api/v1/data/cyber/known-exploited` | Upsert the full snapshot by CVE and retain `dateAdded`, `dueDate`, ransomware status, and catalog version. |
+| 17 | **FIRST EPSS** — [public API](https://api.first.org/data/v1/epss?limit=1) | Daily 30-day exploitation probabilities and percentiles for CVEs. It prioritizes the broader vulnerability universe around CISA KEV. | `/api/v1/data/cyber/exploit-probability` | The API needs no authentication and allows 1,000 requests/minute, but is marked beta. Prefer the daily compressed CSV for full syncs; use the API for CVE batches and recent time series. |
+| 18 | **NASA EONET v3** — [open events](https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=200) | Near-real-time global wildfires, storms, volcanoes, floods, landslides, droughts, dust storms, and ice events with geometry. | `/api/v1/data/disasters/eonet` | Deduplicate overlap with GDACS by source ID and time/geometry. The endpoint currently labels its JSON body as `application/rss+xml`, so parse by content. |
 
 ## P1 — valuable after P0
 
@@ -70,6 +72,10 @@ These sources are directly accessible but are narrower, overlapping, region-spec
 
 | Source | Access | Why it is useful | Reason it follows P0 |
 | --- | --- | --- | --- |
+| [OECD Data Explorer SDMX API](https://sdmx.oecd.org/public/rest/v1/dataflow/all/all/latest?detail=allstubs) | Direct / no auth / SDMX-XML, SDMX-JSON, and CSV | Cross-country prices, national accounts, labor, productivity, trade, taxation, environment, and social indicators. | It substantially overlaps IMF, World Bank, Eurostat, BIS, and existing macro routes. Start only with OECD-specific series and never request the full 1+ MB dataflow catalog per user query. |
+| [ECB Data Portal SDMX API](https://data-api.ecb.europa.eu/service/data/EXR/M.USD.EUR.SP00.A?startPeriod=2026-01&endPeriod=2026-01&format=csvdata) | Direct / no auth / SDMX and CSV | Euro-area banking, monetary aggregates, payments, securities, rates, balance sheets, and supervisory statistics. | ECB FX is already integrated and much macro coverage overlaps BIS and Eurostat; extend the existing ECB adapter with curated non-FX flows instead of adding a duplicate source. |
+| [NASA POWER daily API](https://power.larc.nasa.gov/api/temporal/daily/point?start=20260701&end=20260702&latitude=37&longitude=-76&community=RE&parameters=T2M&format=JSON) | Direct / no auth / JSON, CSV, NetCDF, and ASCII | Analysis-ready global solar, temperature, precipitation, wind, and meteorological time series for energy, agriculture, and physical-risk models. | Point and regional requests require spatial/date curation and overlap ERA5 and existing NASA climate data. Limit concurrency to five and cache repeated coordinates. |
+| [US CPSC recalls](https://www.saferproducts.gov/RestWebServices/Recall?format=json&RecallID=1) | Direct / no auth / JSON, XML, and delimited exports | Product recalls with companies, hazards, injuries, remedies, retailers, countries of manufacture, UPCs, and images. | US-only and narrower than the immediate finance/geopolitics backlog; use recall ID/date filters because an unbounded request is tens of megabytes. |
 | [GB Carbon Intensity](https://api.carbonintensity.org.uk/intensity) | Direct / no auth / JSON and XML / CC BY 4.0 | Current and forecast national/regional carbon intensity plus generation mix. | It overlaps Elexon and is Great Britain-only, but offers a much simpler emissions signal. |
 | [NOAA CO-OPS](https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?date=latest&station=9414290&product=water_level&datum=MLLW&units=metric&time_zone=gmt&format=json&application=FinUties) | Direct / no auth / JSON, CSV, XML | Coastal and Great Lakes water levels, currents, tides, winds, visibility, and flood-level metadata. | US-only and station metadata must be joined before observations become map-ready. |
 | [NOAA Aviation Weather Center](https://aviationweather.gov/api/data/metar?ids=KMCI&format=json) | Direct / no auth / JSON, GeoJSON, CSV, XML | Worldwide METARs, TAFs, SIGMETs, pilot reports, airports, and navigation features. | Operationally valuable but domain-specific. Use minute-updated cache files for full datasets and keep API traffic below 100 requests/minute. |
@@ -104,6 +110,8 @@ These sources are useful but fail at least one “free and directly accessible�
 | **ReliefWeb API v2** | Since 2025-11-01, every client needs a pre-approved `appname`. | An application name has been approved and configured. |
 | **ACLED** | Already a placeholder; access requires an account/token and license compliance. | Credentials and permitted redistribution are confirmed. |
 | **OpenSanctions** | Bulk files are non-commercial; commercial use and hosted matching require payment. | A commercial data license or hosted API budget is approved. |
+| **AEMO NEMWeb** | Current and archived Australian National Electricity Market CSV/ZIP files are anonymously accessible, but AEMO states the data is for information only and is not intended for commercial use. The 2026 platform migration also made HTTPS and URL case exactness mandatory. | Legal approves the intended use and an adapter can handle directory discovery, case-sensitive file names, rolling current windows, and monthly archives. |
+| **US Census International Trade API** | Detailed monthly US import/export data is high value, but all API queries now require a registered key and overlap UN Comtrade. | A service key is available and a narrow, timelier US trade slice justifies the duplicate coverage. |
 | **Commercial AIS sites** | MarineTraffic, VesselFinder, and peers restrict automated access and sell APIs. | A licensed API is purchased; do not scrape these sites. |
 
 ## Scraping and file-discovery queue
@@ -113,8 +121,9 @@ Scraping is a fallback. When an official page links a changing asset, scrape onl
 | Priority | Target | Technique | Required safeguards |
 | --- | --- | --- | --- |
 | 1 | [Australian DFAT Consolidated List](https://www.dfat.gov.au/international-relations/security/sanctions/consolidated-list) | Discover the official XLSX link and normalize the downloaded rows. | Detect header changes, preserve aliases, record timestamp/checksum, and alert on a missing link. |
-| 2 | UNCTAD liner-shipping connectivity export | Prefer a stable bulk request discovered from the official data center. | Pin indicator IDs, archive metadata, rate-limit, and stop on schema/layout changes. |
-| 3 | Canadian sanctions regulations | Monitor official legislation XML and parse designation schedules. | Require legal review, bilingual names, amendment tracking, deterministic IDs, and regression fixtures. |
+| 2 | [World Bank debarred firms and individuals](https://www.worldbank.org/en/projects-operations/procurement/debarred-firms) | Parse the official table or discover a documented export; do not depend on the old undocumented `wp-content/cache/developer/json/v2/all.json` path, which now serves HTML. | Preserve names, addresses, countries, grounds, ineligibility dates, and cross-debarment notes; use deterministic IDs and schema-change fixtures. |
+| 3 | UNCTAD liner-shipping connectivity export | Prefer a stable bulk request discovered from the official data center. | Pin indicator IDs, archive metadata, rate-limit, and stop on schema/layout changes. |
+| 4 | Canadian sanctions regulations | Monitor official legislation XML and parse designation schedules. | Require legal review, bilingual names, amendment tracking, deterministic IDs, and regression fixtures. |
 
 Do not scrape to bypass authentication, payment, robots controls, rate limits, or license restrictions.
 
@@ -123,7 +132,7 @@ Do not scrape to bypass authentication, payment, robots controls, rate limits, o
 1. **Maritime and compliance:** IMF PortWatch, UK Sanctions List, and GLEIF.
 2. **Banking and funding risk:** FDIC, OFR, Bank of Canada, and BIS.
 3. **Energy security:** ENTSOG, MIDAS, and Elexon.
-4. **Macro and procurement:** Eurostat, EU TED, and USAspending.
+4. **Macro, procurement, and development finance:** Eurostat, EU TED, Find a Tender, USAspending, and World Bank Projects.
 5. **Operational risk:** CISA KEV, FIRST EPSS, and NASA EONET.
 6. Add P1 feeds only after measuring overlap and defining category ownership.
 
@@ -139,6 +148,8 @@ For every new adapter:
 
 ## Live verification record
 
-On 2026-07-21, unauthenticated requests returned HTTP 200 and structured data for all 16 P0 entry points. EU TED was verified with an anonymous JSON POST. The newly added GB Carbon Intensity, NOAA CO-OPS, Aviation Weather Center, and eCFR API examples also returned HTTP 200. NASA EONET still returned JSON with an incorrect `application/rss+xml` content type. USAspending's old singular agency reference path returned HTTP 404; the documented `toptier_agencies` path returned JSON with HTTP 200.
+On 2026-07-22, unauthenticated requests returned HTTP 200 for all 18 P0 entry points. EU TED was verified with an anonymous JSON POST. Find a Tender returned an OCDS 1.1 release package with an OGL v3 license link, and World Bank Projects returned a bounded JSON project set. The new OECD, ECB, NASA POWER, and CPSC P1 examples also returned HTTP 200; the CPSC query returned one structured JSON recall when filtered by `RecallID`.
+
+The AEMO NEMWeb report directory also returned HTTP 200 anonymously, but it remains P2 because of the stated use restriction. The historical World Bank debarment `all.json` path returned HTTP 200 with `text/html` and the Operations Search application, so it is not a working JSON API. NASA EONET still returned JSON with an incorrect `application/rss+xml` content type.
 
 Endpoint availability is evidence of technical access, not blanket permission to redistribute the data.
