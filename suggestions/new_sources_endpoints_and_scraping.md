@@ -2134,8 +2134,6 @@ here; OpenSanctions full `entities.ftm.json` ~352 MB (prefer national lists; see
 | SEC EDGAR full-text search (EFTS) | `https://efts.sec.gov/LATEST/search-index?q=apple&forms=10-K&from=0&size=1` | Anonymous JSON works with User-Agent; already overlaps the terminal SEC stack — only add if a standalone search product is desired. |
 | NWS `api.weather.gov` | `https://api.weather.gov/alerts/active?status=actual&message_type=alert` | GeoJSON alerts live (descriptive User-Agent); registry already has `weather/alerts` — prefer extending that adapter. Do not pass unsupported `limit`. |
 | UN Comtrade Plus public preview | `https://comtradeapi.un.org/public/v1/preview/C/A/HS` | Preview JSON returned 200 (~445 KB) here; production Comtrade Plus still key-shaped — treat as discovery/sample, not full warehouse. |
-
-
 | Nager.Date public holidays | `https://date.nager.at/api/v3/PublicHolidays/2026/US` | Free worldwide holiday calendar; useful scheduling metadata but not a core market print. |
 | Wikimedia pageviews | `https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/all-agents/Federal_Reserve/daily/20260701/20260731` | Attention proxy for entities/topics; noisy vs primary financial sources. |
 | deps.dev (companion to OSV) | `https://api.deps.dev/v3/systems/npm/packages/lodash` | **Promoted to P0 #164** (lodash package JSON verified 2026-08-05). |
