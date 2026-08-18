@@ -1,3 +1,11 @@
+.env
+.venv/
+.ipynb_checkpoints/
+node_modules/
 notebooks/.env
+notebooks/.venv/
+notebooks/.ipynb_checkpoints/
+terminal/.env
 terminal/node_modules/
 .DS_Store
+

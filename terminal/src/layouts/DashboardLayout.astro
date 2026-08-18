@@ -9,7 +9,7 @@ interface Props {
   active?: string;
 }
 
-const { title, description = 'FinUites Terminal Community dashboard', active = '' } = Astro.props;
+const { title, description = 'FinUties Terminal Community dashboard', active = '' } = Astro.props;
 const site = String(Astro.site ?? '').replace(/\/$/, '');
 const canonical = `${site}${Astro.url.pathname}`;
 const API_ORIGIN = import.meta.env.PUBLIC_API_ORIGIN || 'https://data.finuties.com';

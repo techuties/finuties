@@ -1,8 +1,13 @@
 {
-  "name": "finuites-terminal-community",
+  "name": "finuties-terminal-community",
   "type": "module",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/techuties/finuties.git"
+  },
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",

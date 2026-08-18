@@ -28,3 +28,15 @@ test('login page communicates API-key-only authentication', async () => {
   assert.match(content, /Connect with API Key/);
   assert.match(content, /only supports API key authentication/i);
 });
+
+test('public GitHub URL points at techuties/finuties', async () => {
+  const loginPagePath = resolve(process.cwd(), 'src/pages/index.astro');
+  const packagePath = resolve(process.cwd(), 'package.json');
+  const login = await readFile(loginPagePath, 'utf8');
+  const pkg = await readFile(packagePath, 'utf8');
+
+  assert.match(login, /https:\/\/github\.com\/techuties\/finuties/);
+  assert.doesNotMatch(login, /finuties-terminal/);
+  assert.match(pkg, /https:\/\/github\.com\/techuties\/finuties\.git/);
+  assert.doesNotMatch(pkg, /finuites/);
+});

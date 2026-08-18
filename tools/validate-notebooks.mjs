@@ -15,6 +15,7 @@ async function listNotebookFiles(baseDir) {
   for (const entry of entries) {
     const fullPath = resolve(baseDir, entry.name);
     if (entry.isDirectory()) {
+      if (entry.name === ".venv" || entry.name === ".ipynb_checkpoints") continue;
       out.push(...(await listNotebookFiles(fullPath)));
       continue;
     }
@@ -23,15 +24,15 @@ async function listNotebookFiles(baseDir) {
   return out;
 }
 
+function cellSource(cell) {
+  if (Array.isArray(cell.source)) return cell.source.join("");
+  if (typeof cell.source === "string") return cell.source;
+  return "";
+}
+
 function extractNotebookText(nb) {
   const cells = Array.isArray(nb.cells) ? nb.cells : [];
-  return cells
-    .map((cell) => {
-      if (Array.isArray(cell.source)) return cell.source.join("");
-      if (typeof cell.source === "string") return cell.source;
-      return "";
-    })
-    .join("\n");
+  return cells.map(cellSource).join("\n");
 }
 
 function validateNotebookStructure(nb, relPath) {
@@ -41,11 +42,18 @@ function validateNotebookStructure(nb, relPath) {
   }
 
   const markdownCount = cells.filter((c) => c.cell_type === "markdown" || c.cell_type === "raw").length;
-  const codeCount = cells.filter((c) => c.cell_type === "code").length;
-  if (markdownCount < 1 || codeCount < 3) {
+  const codeCells = cells.filter((c) => c.cell_type === "code");
+  if (markdownCount < 1 || codeCells.length < 3) {
     throw new Error(
       `${relPath}: expected at least 1 markdown cell and 3 code cells for readability and depth`,
     );
+  }
+
+  for (const [idx, cell] of cells.entries()) {
+    if (cell.cell_type !== "code") continue;
+    if (cellSource(cell).trim() === "") {
+      throw new Error(`${relPath}: code cell ${idx} is empty`);
+    }
   }
 }
 
@@ -73,8 +81,11 @@ for (const filePath of notebooks) {
 }
 
 const envExample = await readFile(resolve(NOTEBOOK_ROOT, ".env.example"), "utf8");
-if (!envExample.includes("FINUTIES_API_KEY=") || !envExample.includes("FINUTIES_API_ORIGIN=")) {
-  throw new Error("notebooks/.env.example must include FINUTIES_API_KEY and FINUTIES_API_ORIGIN");
+if (!envExample.includes("FINUTIES_API_KEY=")) {
+  throw new Error("notebooks/.env.example must include FINUTIES_API_KEY=");
+}
+if (!/auth\/sandbox/.test(envExample)) {
+  throw new Error("notebooks/.env.example must mention POST /api/v1/auth/sandbox");
 }
 
 const requirements = await readFile(resolve(NOTEBOOK_ROOT, "requirements.txt"), "utf8");
