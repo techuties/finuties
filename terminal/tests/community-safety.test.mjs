@@ -29,6 +29,18 @@ test('login page communicates API-key-only authentication', async () => {
   assert.match(content, /only supports API key authentication/i);
 });
 
+test('explore demotes conflict and maritime to labeled research (TERM-1 public subset)', async () => {
+  const landingPath = resolve(process.cwd(), 'src/lib/explore/views/landing.ts');
+  const registryPath = resolve(process.cwd(), 'src/lib/source-registry.ts');
+  const landing = await readFile(landingPath, 'utf8');
+  const registry = await readFile(registryPath, 'utf8');
+
+  assert.doesNotMatch(landing, /source=ucdp/);
+  assert.match(landing, /research only/);
+  assert.match(registry, /RESEARCH_CATEGORY_IDS.*politics.*maritime/s);
+  assert.match(registry, /categoryDisplayLabel/);
+});
+
 test('public GitHub URL points at techuties/finuties', async () => {
   const loginPagePath = resolve(process.cwd(), 'src/pages/index.astro');
   const packagePath = resolve(process.cwd(), 'package.json');

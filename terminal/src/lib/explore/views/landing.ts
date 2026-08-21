@@ -8,7 +8,15 @@ import {
   podGrid, pod, kpiStrip, emptyGroup, esc, badgeCls,
   type RenderContext,
 } from '../layout';
-import { CATEGORIES, sourcesForCategory, type SourceDef } from '../../source-registry';
+import {
+  COMMERCIAL_EXPLORE_CATEGORIES,
+  RESEARCH_EXPLORE_CATEGORIES,
+  categoryDisplayLabel,
+  sourcesForCategory,
+  isResearchCategory,
+  type CategoryDef,
+  type SourceDef,
+} from '../../source-registry';
 import { fetchSourceAvailability, type SourceAvailability } from '../../global-data-api';
 
 // ─── Shared pod helpers (used by both sync render and async overlay) ────────
@@ -20,9 +28,11 @@ function heroSearchPod(): string {
     '<div class="flex items-center justify-center gap-3 flex-wrap">' +
     '<a href="/explore?q=AAPL" class="rounded-full bg-fin-800/60 px-3 py-1 text-xs text-slate-300 hover:bg-fin-700/60 transition-colors">AAPL</a>' +
     '<a href="/explore?q=Germany" class="rounded-full bg-fin-800/60 px-3 py-1 text-xs text-slate-300 hover:bg-fin-700/60 transition-colors">Germany</a>' +
-    '<a href="/explore?mode=data&source=ucdp" class="rounded-full bg-fin-800/60 px-3 py-1 text-xs text-slate-300 hover:bg-fin-700/60 transition-colors">UCDP Conflicts</a>' +
+    '<a href="/explore?mode=data&source=cftc_legacy_futures-facts" class="rounded-full bg-fin-800/60 px-3 py-1 text-xs text-slate-300 hover:bg-fin-700/60 transition-colors">CFTC positioning</a>' +
     '<a href="/explore?q=Berkshire" class="rounded-full bg-fin-800/60 px-3 py-1 text-xs text-slate-300 hover:bg-fin-700/60 transition-colors">Berkshire Hathaway</a>' +
-    '</div></div>',
+    '</div>' +
+    '<p class="mt-4 text-xs text-slate-500">Filings, ownership, equities, positioning, rates, economics, and calendar carry published freshness budgets. Conflict and maritime catalogues are research only — not a commercial commitment.</p>' +
+    '</div>',
     { span: 4 },
   );
 }
@@ -55,9 +65,20 @@ export function renderLanding(ctx: RenderContext): void {
   const recentPod = recentSearchesPod();
   if (recentPod) pods.push(recentPod);
 
-  for (const cat of CATEGORIES) {
+  for (const cat of COMMERCIAL_EXPLORE_CATEGORIES) {
     const sources = sourcesForCategory(cat.id);
     pods.push(pod(buildCategoryPod(cat, sources), { span: 1 }));
+  }
+
+  if (RESEARCH_EXPLORE_CATEGORIES.length > 0) {
+    pods.push(pod(
+      '<p class="text-[11px] text-slate-500">Research catalogues — not part of the P0 commercial surface or published freshness budgets.</p>',
+      { title: 'Research only', span: 4, compact: true },
+    ));
+    for (const cat of RESEARCH_EXPLORE_CATEGORIES) {
+      const sources = sourcesForCategory(cat.id);
+      pods.push(pod(buildCategoryPod(cat, sources, undefined, true), { span: 1 }));
+    }
   }
 
   ctx.sectionsGrid.innerHTML = podGrid(pods);
@@ -68,9 +89,10 @@ export function renderLanding(ctx: RenderContext): void {
 // ─── Category pod builder ───────────────────────────────────────────────────
 
 function buildCategoryPod(
-  cat: { id: string; label: string; color: string; icon: string },
+  cat: CategoryDef,
   sources: SourceDef[],
   availMap?: Record<string, SourceAvailability>,
+  research = false,
 ): string {
   let availCount = 0;
   let totalRows = 0;
@@ -91,7 +113,10 @@ function buildCategoryPod(
   let inner = '<a href="/explore?mode=data&category=' + esc(cat.id) + '" class="block hover:opacity-80 transition-opacity">';
   inner += '<div class="flex items-center gap-2 mb-1.5">';
   inner += '<svg class="w-5 h-5" style="color:' + cat.color + '" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">' + cat.icon + '</svg>';
-  inner += '<span class="text-sm font-semibold text-slate-200">' + esc(cat.label) + '</span>';
+  inner += '<span class="text-sm font-semibold text-slate-200">' + esc(categoryDisplayLabel(cat)) + '</span>';
+  if (research) {
+    inner += '<span class="text-[9px] rounded-full px-1.5 py-0.5 font-medium bg-amber-500/20 text-amber-400">research</span>';
+  }
 
   if (hasAvailData) {
     if (availCount > 0) {
@@ -140,31 +165,57 @@ async function overlayAvailability(ctx: RenderContext): Promise<void> {
   const recentPod = recentSearchesPod();
   if (recentPod) pods.push(recentPod);
 
-  // Split categories into available vs unavailable
-  const availableCats: { cat: typeof CATEGORIES[0]; sources: SourceDef[] }[] = [];
-  const unavailableCatLabels: string[] = [];
+  const appendCategoryPods = (cats: CategoryDef[], avail?: Record<string, SourceAvailability>): void => {
+    for (const cat of cats) {
+      const sources = sourcesForCategory(cat.id);
+      if (avail) {
+        let catHasData = false;
+        for (const src of sources) {
+          const key = src.id.replace(/-/g, '_');
+          if (avail[key]?.available) { catHasData = true; break; }
+        }
+        if (!catHasData) continue;
+      }
+      pods.push(pod(buildCategoryPod(cat, sources, avail, isResearchCategory(cat.id)), { span: 1 }));
+    }
+  };
 
-  for (const cat of CATEGORIES) {
+  appendCategoryPods(COMMERCIAL_EXPLORE_CATEGORIES, availMap);
+
+  const researchUnavailable = RESEARCH_EXPLORE_CATEGORIES
+    .filter((cat) => {
+      const sources = sourcesForCategory(cat.id);
+      return !sources.some((src) => {
+        const key = src.id.replace(/-/g, '_');
+        return availMap[key]?.available;
+      });
+    })
+    .map((cat) => categoryDisplayLabel(cat));
+
+  if (RESEARCH_EXPLORE_CATEGORIES.some((cat) => {
     const sources = sourcesForCategory(cat.id);
-    let catHasData = false;
-    for (const src of sources) {
-      const key = src.id.replace(/-/g, '_');
-      const info = availMap[key];
-      if (info?.available) { catHasData = true; break; }
-    }
-    if (catHasData) {
-      availableCats.push({ cat, sources });
-    } else {
-      unavailableCatLabels.push(cat.label);
-    }
+    return sources.some((src) => availMap[src.id.replace(/-/g, '_')]?.available);
+  })) {
+    pods.push(pod(
+      '<p class="text-[11px] text-slate-500">Research catalogues — not part of the P0 commercial surface or published freshness budgets.</p>',
+      { title: 'Research only', span: 4, compact: true },
+    ));
+    appendCategoryPods(RESEARCH_EXPLORE_CATEGORIES, availMap);
   }
 
-  for (const { cat, sources } of availableCats) {
-    pods.push(pod(buildCategoryPod(cat, sources, availMap), { span: 1 }));
+  if (researchUnavailable.length > 0) {
+    pods.push(emptyGroup(researchUnavailable, { title: 'Research catalogues awaiting data', span: 4 }));
   }
 
-  if (unavailableCatLabels.length > 0) {
-    pods.push(emptyGroup(unavailableCatLabels, { title: 'Awaiting data ingestion', span: 4 }));
+  const commercialUnavailable = COMMERCIAL_EXPLORE_CATEGORIES
+    .filter((cat) => {
+      const sources = sourcesForCategory(cat.id);
+      return !sources.some((src) => availMap[src.id.replace(/-/g, '_')]?.available);
+    })
+    .map((cat) => cat.label);
+
+  if (commercialUnavailable.length > 0) {
+    pods.push(emptyGroup(commercialUnavailable, { title: 'Awaiting data ingestion', span: 4 }));
   }
 
   ctx.sectionsGrid.innerHTML = podGrid(pods);

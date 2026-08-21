@@ -10,7 +10,7 @@ import {
 } from '../layout';
 import {
   CATEGORIES as REG_CATEGORIES, SOURCES as REG_SOURCES,
-  CATEGORY_MAP, sourcesForCategory,
+  CATEGORY_MAP, sourcesForCategory, categoryDisplayLabel, isResearchCategory,
   type CategoryId,
 } from '../../source-registry';
 
@@ -24,8 +24,9 @@ export function renderCategorySourceList(ctx: RenderContext): void {
 
   ctx.typeBadge.textContent = 'Data';
   ctx.typeBadge.className = badgeCls('bg-pink-500/20 text-pink-400');
-  ctx.nameEl.textContent = cat.label;
-  ctx.subEl.textContent = sources.length + ' data sources';
+  ctx.nameEl.textContent = categoryDisplayLabel(cat);
+  ctx.subEl.textContent = sources.length + ' data sources'
+    + (isResearchCategory(cat.id) ? ' · research only, not a commercial SLO' : '');
 
   // Category tabs
   let tabsHtml = '<div class="flex gap-1.5 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-fin-700 pod-span-4">';
@@ -33,7 +34,7 @@ export function renderCategorySourceList(ctx: RenderContext): void {
     const active = c.id === cat.id;
     tabsHtml += '<a href="/explore?mode=data&category=' + esc(c.id) + '" class="flex-shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors ' +
       (active ? 'text-white' : 'text-slate-400 hover:text-slate-200 bg-fin-800/40 hover:bg-fin-800/60') + '"' +
-      (active ? ' style="background:' + c.color + '"' : '') + '>' + esc(c.shortLabel) + '</a>';
+      (active ? ' style="background:' + c.color + '"' : '') + '>' + esc(isResearchCategory(c.id) ? c.shortLabel + '*' : c.shortLabel) + '</a>';
   }
   tabsHtml += '</div>';
 
@@ -69,7 +70,10 @@ export function renderAllCategories(ctx: RenderContext): void {
     const sources = sourcesForCategory(cat.id);
     let inner = '<div class="flex items-center gap-2 mb-1.5">';
     inner += '<svg class="w-5 h-5" style="color:' + cat.color + '" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">' + cat.icon + '</svg>';
-    inner += '<span class="text-sm font-semibold text-slate-200">' + esc(cat.label) + '</span>';
+    inner += '<span class="text-sm font-semibold text-slate-200">' + esc(categoryDisplayLabel(cat)) + '</span>';
+    if (isResearchCategory(cat.id)) {
+      inner += '<span class="text-[9px] rounded-full px-1.5 py-0.5 font-medium bg-amber-500/20 text-amber-400">research</span>';
+    }
     inner += '</div>';
     inner += '<p class="text-[10px] text-slate-500">' + sources.length + ' source' + (sources.length !== 1 ? 's' : '') + ': ' + sources.map(s => s.shortLabel).join(', ') + '</p>';
     pods.push(pod('<a href="/explore?mode=data&category=' + esc(cat.id) + '" class="block hover:opacity-80 transition-opacity">' + inner + '</a>', { span: 1 }));
