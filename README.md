@@ -6,6 +6,21 @@ This repo is the open Terminal and notebooks; the hosted product is at [www.finu
 
 Developed by TechUties.
 
+## Status
+
+Honest snapshot for visitors — updated when public GitHub ships.
+
+| What | State |
+| --- | --- |
+| **Try it** | Clone this repo → sandbox key → open `notebooks/00_start_here.ipynb` against the live API at [data.finuties.com](https://data.finuties.com). |
+| **Community Terminal** | `terminal/` is an open subset of the hosted app at [terminal.finuties.com](https://terminal.finuties.com). Run locally with the same `fin_sk_...` key. |
+| **Explore labels** | Conflict and Maritime categories in the public Terminal are labeled **(research)** — visible, not a commercial P0 offer ([96d34e8](https://github.com/techuties/finuties/commit/96d34e8)). |
+| **CI** | GitHub Actions on push/PR to `main`: notebook static validation + Terminal unit tests. Branch protection is not enabled. |
+| **What we are** | Public-market data for you — governed REST and MCP over filings, ownership, equities, positioning, rates, economics, calendar, and pipeline health. **Not a broker. Not investment advice.** |
+| **Community tree notes** | `/admin` exists (admin API token required). Community Terminal is a subset of the hosted app — not a byte-for-byte mirror. |
+
+Open draft PRs from the Cursor bot (endpoint source suggestions) are triaged separately — they are not merged by default.
+
 ## This directory
 
 This folder **is** the public GitHub working tree (`techuties/finuties`). Public work lives here: `terminal/` (community Terminal) and `notebooks/`. Develop the public Terminal **in this folder** — it is a community subset, not a symlink of the private hosted app.
