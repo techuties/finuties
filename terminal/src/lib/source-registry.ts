@@ -170,7 +170,12 @@ export const CATEGORIES: CategoryDef[] = [
 export const CATEGORY_MAP = new Map<CategoryId, CategoryDef>(CATEGORIES.map((c) => [c.id, c]));
 
 /** Non-P0 Explore categories — visible but labeled research, not a commercial SLO. */
-export const RESEARCH_CATEGORY_IDS: readonly CategoryId[] = ['politics', 'maritime'] as const;
+export const RESEARCH_CATEGORY_IDS: readonly CategoryId[] = [
+  'politics',
+  'maritime',
+  'climate',
+  'sanctions',
+] as const;
 
 export function isResearchCategory(catId: CategoryId): boolean {
   return (RESEARCH_CATEGORY_IDS as readonly string[]).includes(catId);

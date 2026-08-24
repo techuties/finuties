@@ -1,82 +1,74 @@
 # FinUties
 
-FinUties is public-market data for you — one governed REST and MCP contract over filings, ownership, equities, positioning, rates, economics, calendar, and pipeline health, with published freshness.
+Public-market data for you — one governed REST and MCP contract over filings, ownership, equities, positioning, rates, economics, calendar, and pipeline health, with published freshness.
 
-This repo is the open Terminal and notebooks; the hosted product is at [www.finuties.com](https://www.finuties.com) (API: [data.finuties.com](https://data.finuties.com), Terminal: [terminal.finuties.com](https://terminal.finuties.com)).
+This repo is the **community Terminal** (customizable UI + updateable cards) and example notebooks. The hosted product is at [www.finuties.com](https://www.finuties.com) (API: [data.finuties.com](https://data.finuties.com), Terminal: [terminal.finuties.com](https://terminal.finuties.com)).
 
-Developed by TechUties.
+Developed by TechUties. **Not a broker. Not investment advice.**
 
-## Status
+## Download → deploy
 
-Honest snapshot for visitors — updated when public GitHub ships.
-
-| What | State |
-| --- | --- |
-| **Try it** | Clone this repo → sandbox key → open `notebooks/00_start_here.ipynb` against the live API at [data.finuties.com](https://data.finuties.com). |
-| **Community Terminal** | `terminal/` is an open subset of the hosted app at [terminal.finuties.com](https://terminal.finuties.com). Run locally with the same `fin_sk_...` key. |
-| **Explore labels** | Conflict and Maritime categories in the public Terminal are labeled **(research)** — visible, not a commercial P0 offer ([96d34e8](https://github.com/techuties/finuties/commit/96d34e8)). |
-| **CI** | GitHub Actions on push/PR to `main`: notebook static validation + Terminal unit tests. Branch protection is not enabled. |
-| **What we are** | Public-market data for you — governed REST and MCP over filings, ownership, equities, positioning, rates, economics, calendar, and pipeline health. **Not a broker. Not investment advice.** |
-| **Community tree notes** | `/admin` exists (admin API token required). Community Terminal is a subset of the hosted app — not a byte-for-byte mirror. |
-
-Open draft PRs from the Cursor bot (endpoint source suggestions) are triaged separately — they are not merged by default.
-
-## This directory
-
-This folder **is** the public GitHub working tree (`techuties/finuties`). Public work lives here: `terminal/` (community Terminal) and `notebooks/`. Develop the public Terminal **in this folder** — it is a community subset, not a symlink of the private hosted app.
-
-If this checkout is `finuties-public/` inside the private monorepo: the private Terminal is `../edge/terminal/` (different app; do not merge blindly). The private tree gitignores `finuties-public/` on purpose.
-
-## What you need
-
-- Python 3.12
-- A FinUties API key
-- Node.js only if you run the Terminal locally
-
-## 1. Clone
+Anybody can start immediately. This repo is the client. It does **not** include ingest, collectors, or the hosted platform.
 
 ```bash
 git clone https://github.com/techuties/finuties.git
-cd finuties
+cd finuties/terminal
+npm install
+npm run dev
 ```
 
-## 2. Install Python 3.12 packages
+Open the local URL. With no extra env, the client calls `https://data.finuties.com`.
 
-```bash
-python3.12 -m pip install -r notebooks/requirements.txt
-```
+### Login or API key
 
-## 3. Get a sandbox key
+1. **Login** at [finuties.com](https://www.finuties.com) (account, [public test](https://www.finuties.com/free-public-test/), or Settings) and copy your `fin_sk_...` key, **or**
+2. **Sandbox key** (about 72 hours):
 
 ```bash
 curl -sS -X POST https://data.finuties.com/api/v1/auth/sandbox
 ```
 
-Copy the JSON `key` field (it starts with `fin_sk_`). Sandbox keys expire in about 72 hours. For a longer-lived key, use [finuties.com/settings](https://www.finuties.com/settings).
+Paste the key on the Terminal connect page. The community app uses API-key auth in the browser; account login lives on finuties.com.
 
-## 4. Write `notebooks/.env`
+Free public-test keys are **P0 data + MCP only** — not analytics packs and not a paid assistant.
 
-```bash
-cp notebooks/.env.example notebooks/.env
-```
-
-Set one line:
-
-```
-FINUTIES_API_KEY=fin_sk_...
-```
-
-## 5. Open the notebooks
-
-From the repository root:
+### Point at another API (optional)
 
 ```bash
+cp .env.example .env
+# PUBLIC_API_ORIGIN=https://data.finuties.com
+```
+
+Leave `PUBLIC_API_ORIGIN` unset to keep the hosted default.
+
+### Cards
+
+Dashboard cards register through `src/lib/card-registry.ts` (`registerCard`). Keep `type` ids stable so saved layouts keep working. Add or edit a module under `src/lib/cards/`.
+
+## Status
+
+Honest snapshot — this is a **community client**, not the open-sourced platform.
+
+| What | State |
+| --- | --- |
+| **Try it** | Clone → key (login or sandbox) → `cd terminal && npm install && npm run dev`. |
+| **Community Terminal** | Open subset of the hosted app. Same `fin_sk_...` key. |
+| **Explore labels** | Conflict, climate, sanctions, and maritime are labeled **(research)** — visible, not a commercial P0 offer. |
+| **CI** | GitHub Actions on push/PR to `main`: notebook static validation + Terminal unit tests. Branch protection is not enabled. |
+| **Not in this repo** | Ingest, collectors, API server, analytics node, trading, ops runbooks. Point the client at the hosted API. |
+| **Not in this client** | Data-ops `/admin` and Workbench `/analyze` stay on the hosted Terminal (`terminal.finuties.com`). This tree does not ship those routes. |
+
+Open draft PRs from the Cursor bot (endpoint source suggestions) are triaged separately — they are not merged by default.
+
+## Optional: notebooks
+
+Python 3.12. Same key as the Terminal.
+
+```bash
+python3.12 -m pip install -r notebooks/requirements.txt
+cp notebooks/.env.example notebooks/.env   # FINUTIES_API_KEY=fin_sk_...
 jupyter lab notebooks/00_start_here.ipynb
 ```
-
-Run cells top to bottom. Start with `00_start_here.ipynb`.
-
-### Notebooks
 
 | Notebook | What it does | Live endpoint |
 | --- | --- | --- |
@@ -87,46 +79,29 @@ Run cells top to bottom. Start with `00_start_here.ipynb`.
 | `notebooks/equity_flows/equity_flow_baseline.ipynb` | 13F top-company concentration | `/api/v1/holdings/top-companies` |
 | `notebooks/risk_models/volatility_regime_baseline.ipynb` | Crypto 24h risk snapshot | `/api/v1/data/crypto/prices` |
 
-## 6. Optional: Terminal
+`/api/v1/data/commodities/prices` and `/api/v1/data/macro/series` are not live routes (404). The notebooks above use endpoints that returned 200 when checked.
 
-```bash
-cd terminal
-npm install
-npm run dev
-```
+`commodities_snapshot_baseline` and `volatility_regime_baseline` are research notebooks (World Bank commodity prices; crypto 24h). They are not P0 commercial SLOs. Empty or partial pulls should be named, not smoothed.
 
-Open the local URL and paste the same `fin_sk_...` key. With no extra env, the client calls `https://data.finuties.com`. Copy `terminal/.env.example` to `terminal/.env` only if you need to override that.
+## Replayable evidence
 
-The Terminal uses API-key authentication only (no username/password in this app).
+Research trust here is **rerun the same query**, not a logo wall. After each live call, print:
 
-## Project structure
+1. HTTP method + path (and query params)
+2. Pull timestamp (UTC) and any `as_of` / `generated_at` the payload returns
+3. Row count — say empty or partial instead of inventing values
+4. Source family if the payload names one (e.g. CFTC, BLS, SEC 13F)
 
-```mermaid
-flowchart TD
-    A[FinUties] --> B[terminal/]
-    A --> C[notebooks/]
-    A --> D[tools/]
+That is the public-repo analog of a `## Try this query` block. A key is required (sandbox ~72 hours, or a public-test / account key). Public-test keys are **P0 data + MCP only** — not news, not analytics packs, not a hosted assistant.
 
-    B --> B1[src/pages]
-    B --> B2[src/components]
-    B --> B3[src/lib]
-    B --> B4[public]
-    B --> B5[tests]
+This repo does **not** prove customers, freshness SLOs, or ingest health. We do not publish partner logos or citeable usage metrics from here.
 
-    C --> C0[00_start_here.ipynb]
-    C --> C1[commodities]
-    C --> C2[equity_flows]
-    C --> C3[macro_indicators]
-    C --> C4[money_flow]
-    C --> C5[risk_models]
-    C --> C6[requirements.txt + .env.example]
+## This directory
 
-    D --> D1[validate-notebooks.mjs]
-```
+This folder **is** the public GitHub working tree (`techuties/finuties`). Public work lives here: `terminal/` and `notebooks/`. If this checkout is `finuties-public/` inside the private monorepo: the hosted Terminal is `../edge/terminal/` (different app; do not merge blindly). The private tree gitignores `finuties-public/` on purpose.
 
 ## Notes
 
 - MIT License (see `LICENSE`).
 - Keep keys in local `.env` files. Never commit them.
 - `tools/validate-notebooks.mjs` rejects secrets and empty code cells.
-- `/api/v1/data/commodities/prices` and `/api/v1/data/macro/series` are not live routes (404). The notebooks above use endpoints that returned 200 when checked.

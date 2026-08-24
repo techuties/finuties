@@ -81,6 +81,21 @@ export function saveLayout(layout: CardInstance[]): void {
   } catch {}
 }
 
+/**
+ * Research-only card types. Still registerable via `registerCard` / Add module.
+ * Never first-class default home tiles in the community client.
+ */
+export const RESEARCH_HOME_CARD_TYPES = [
+  'climate-monitor',
+  'geopolitical-risk',
+  'sanctions',
+  'trade-maritime',
+] as const;
+
+export function isResearchHomeCard(type: string): boolean {
+  return (RESEARCH_HOME_CARD_TYPES as readonly string[]).includes(type);
+}
+
 export function defaultLayout(): CardInstance[] {
   const preferred = [
     'alerts',
@@ -94,18 +109,16 @@ export function defaultLayout(): CardInstance[] {
     'fed-rates',
     'food-prices',
     'cot-sentiment',
-    'geopolitical-risk',
-    'sanctions',
     'insider-transactions',
     'sec-filings',
     'top-invested',
-  ];
+  ].filter((type) => !isResearchHomeCard(type));
   const defs = allCardDefs();
   const found = preferred
     .map(type => defs.find(d => d.type === type))
     .filter((d): d is CardDefinition => d != null);
   if (found.length === 0) {
-    return defs.slice(0, 6).map((def, i) => ({
+    return defs.filter((d) => !isResearchHomeCard(d.type)).slice(0, 6).map((def, i) => ({
       id: newCardId(),
       type: def.type,
       position: i,

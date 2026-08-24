@@ -4,7 +4,7 @@ import DashboardLayout from '../../layouts/DashboardLayout.astro';
 
 <DashboardLayout
   title="Dashboard — FinUties"
-  description="FinUties Terminal Community dashboard: breaking alerts, world events, macro pulse, energy markets, FX rates, crypto prices, Treasury yields, Fed rates, food prices, COT sentiment, geopolitical risk, sanctions, SEC filings, insider activity, institutional flow, and more."
+  description="FinUties Terminal Community dashboard: breaking alerts, world events, macro pulse, energy markets, FX rates, crypto prices, Treasury yields, Fed rates, food prices, COT sentiment, SEC filings, insider activity, and institutional flow."
   active="dashboard"
 >
   <!-- Auth gate: centralized API key policy -->
@@ -227,7 +227,7 @@ import DashboardLayout from '../../layouts/DashboardLayout.astro';
 
     function defaultLayoutForPersona(nextPersona: DashboardPersona): CardInstance[] {
       if (nextPersona === 'trader') return defaultLayout();
-      const preferred = ['alerts', 'world-events', 'macro-pulse', 'treasury-yields', 'fed-rates', 'sec-filings', 'econ-calendar', 'trade-maritime'];
+      const preferred = ['alerts', 'world-events', 'macro-pulse', 'treasury-yields', 'fed-rates', 'sec-filings', 'econ-calendar'];
       const defs = allCardDefs();
       const selected = preferred.map((t) => defs.find((d) => d.type === t)).filter((d): d is NonNullable<typeof d> => !!d);
       return selected.map((def, i) => ({

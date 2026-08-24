@@ -31,7 +31,7 @@ function heroSearchPod(): string {
     '<a href="/explore?mode=data&source=cftc_legacy_futures-facts" class="rounded-full bg-fin-800/60 px-3 py-1 text-xs text-slate-300 hover:bg-fin-700/60 transition-colors">CFTC positioning</a>' +
     '<a href="/explore?q=Berkshire" class="rounded-full bg-fin-800/60 px-3 py-1 text-xs text-slate-300 hover:bg-fin-700/60 transition-colors">Berkshire Hathaway</a>' +
     '</div>' +
-    '<p class="mt-4 text-xs text-slate-500">Filings, ownership, equities, positioning, rates, economics, and calendar carry published freshness budgets. Conflict and maritime catalogues are research only — not a commercial commitment.</p>' +
+    '<p class="mt-4 text-xs text-slate-500">Filings, ownership, equities, positioning, rates, economics, and calendar carry published freshness budgets. Conflict, climate, sanctions, and maritime catalogues are research only — not a commercial commitment.</p>' +
     '</div>',
     { span: 4 },
   );
