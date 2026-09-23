@@ -6,9 +6,11 @@ This repo is the **community Terminal** (customizable UI + updateable cards) and
 
 Developed by TechUties. **Not a broker. Not investment advice.**
 
-## Download → deploy
+## Local run + health check
 
-Anybody can start immediately. This repo is the client. It does **not** include ingest, collectors, or the hosted platform.
+This repo is the **community client** — not ingest, collectors, or the hosted platform. A fresh clone should look like this:
+
+**Requirements:** Node **22.12+** and npm **9.6.5+** (see `terminal/package.json` `engines`). GitHub Actions CI uses Node 22.
 
 ```bash
 git clone https://github.com/techuties/finuties.git
@@ -17,7 +19,40 @@ npm install
 npm run dev
 ```
 
-Open the local URL. With no extra env, the client calls `https://data.finuties.com`.
+| Check | Command | Expected |
+| --- | --- | --- |
+| Dev server | `npm run dev` | [http://localhost:4321](http://localhost:4321) returns HTTP **200** on `/` |
+| Unit tests | `npm test` | **8/8** pass |
+| Production build | `npm run build` | Writes static site to `terminal/dist/` |
+| Dependency audit | `npm audit` | **0** critical/high (see [terminal/AUDIT.md](terminal/AUDIT.md) for history and re-run steps) |
+| Dev API proxy | `curl -sS -o /dev/null -w "%{http_code}" http://localhost:4321/health` | **200** while `npm run dev` is running |
+
+**Local dev and CORS:** `https://data.finuties.com` only sends `Access-Control-Allow-Origin` for `https://terminal.finuties.com`, so a browser on `http://localhost:4321` cannot call the API directly. `npm run dev` fixes this with a **Vite proxy**: the app uses **same-origin** (`window.location.origin`) for API calls, and `astro.config.mjs` forwards `/api` and `/health` to the hosted API. The connect page reads config from `<body data-*>` attributes (inline scripts must not use Astro template expressions or `define:vars` with `is:inline`). Optional `PUBLIC_API_ORIGIN=` in `terminal/.env` forces same-origin; unset env in dev also defaults to same-origin. Production `npm run build` still defaults to `https://data.finuties.com` when `PUBLIC_API_ORIGIN` is unset (no allowlist weakening). The hosted Terminal at [terminal.finuties.com](https://terminal.finuties.com) does not need this proxy.
+
+**API key (hosted API):**
+
+1. Request a **sandbox key** (~72 hours):
+
+```bash
+curl -sS -X POST https://data.finuties.com/api/v1/auth/sandbox
+```
+
+2. Open [http://localhost:4321](http://localhost:4321) (connect page), paste the `fin_sk_...` key, and continue to the dashboard.
+
+Optional: verify the dev proxy without the browser:
+
+```bash
+# Replace KEY with fin_sk_... from the sandbox response
+curl -sS -H "Authorization: Bearer KEY" http://localhost:4321/api/v1/auth/me | head -c 200
+```
+
+Keys live in **browser `localStorage`** after connect — the Terminal does not read `FINUTIES_API_KEY` from env. Optional `terminal/.env` overrides **public** build-time settings (`PUBLIC_API_ORIGIN`, `PUBLIC_GITHUB_URL`); see `terminal/.env.example`. **Never commit** `.env` or keys. Notebooks use a separate `notebooks/.env` for `FINUTIES_API_KEY`.
+
+Full dependency audit notes: [terminal/AUDIT.md](terminal/AUDIT.md).
+
+## Download → deploy
+
+Same install path as above — deploy the `terminal/dist/` output from `npm run build` to any static host, or run `npm run dev` locally.
 
 ### Login or API key
 
@@ -51,7 +86,7 @@ Honest snapshot — this is a **community client**, not the open-sourced platfor
 
 | What | State |
 | --- | --- |
-| **Try it** | Clone → key (login or sandbox) → `cd terminal && npm install && npm run dev`. |
+| **Try it** | Clone → `cd terminal && npm install && npm run dev` → sandbox key or account key on connect page (Node 22.12+). |
 | **Community Terminal** | Open subset of the hosted app. Same `fin_sk_...` key. |
 | **Explore labels** | Conflict, climate, sanctions, and maritime are labeled **(research)** — visible, not a commercial P0 offer. |
 | **CI** | GitHub Actions on push/PR to `main`: notebook static validation + Terminal unit tests. Branch protection is not enabled. |

@@ -15,10 +15,39 @@ async function walk(dir) {
 
 test('api client defaults keep FinUties API-only mode', async () => {
   const apiClientPath = resolve(process.cwd(), 'src/lib/api-client.ts');
-  const content = await readFile(apiClientPath, 'utf8');
+  const originPath = resolve(process.cwd(), 'src/lib/api-origin.ts');
+  const astroConfigPath = resolve(process.cwd(), 'astro.config.mjs');
+  const apiClient = await readFile(apiClientPath, 'utf8');
+  const origin = await readFile(originPath, 'utf8');
+  const astroConfig = await readFile(astroConfigPath, 'utf8');
 
-  assert.match(content, /const DEFAULT_BASE = \(import\.meta\.env\.PUBLIC_API_ORIGIN \|\| 'https:\/\/data\.finuties\.com'\)\.trim\(\);/);
-  assert.match(content, /const ALLOW_NON_FINUTIES_API = import\.meta\.env\.PUBLIC_ALLOW_NON_FINUTIES_API === 'true';/);
+  assert.match(origin, /FINUTIES_API_ORIGIN = 'https:\/\/data\.finuties\.com'/);
+  assert.match(origin, /return FINUTIES_API_ORIGIN/);
+  assert.doesNotMatch(origin, /PUBLIC_API_ORIGIN\s*\|\|\s*FINUTIES_API_ORIGIN/);
+  assert.doesNotMatch(origin, /PUBLIC_API_ORIGIN\s*\|\|\s*'/);
+  assert.match(origin, /isSameOriginApiBase/);
+  assert.match(origin, /import\.meta\.env\.DEV && isLocalDevApiHostname/);
+  assert.match(apiClient, /const ALLOW_NON_FINUTIES_API = import\.meta\.env\.PUBLIC_ALLOW_NON_FINUTIES_API === 'true';/);
+  assert.match(apiClient, /resolveBrowserApiOrigin\(getConfiguredApiOrigin\(\)\)/);
+  assert.match(apiClient, /resolveBrowserApiOrigin\(''\)/);
+  assert.doesNotMatch(apiClient, /PUBLIC_API_ORIGIN/);
+  assert.match(astroConfig, /'\/api':.*FINUTIES_API_TARGET/);
+  assert.match(astroConfig, /'\/health':.*FINUTIES_API_TARGET/);
+});
+
+test('connect page uses body data attributes for inline scripts (no define:vars)', async () => {
+  const loginPagePath = resolve(process.cwd(), 'src/pages/index.astro');
+  const originPath = resolve(process.cwd(), 'src/lib/api-origin.ts');
+  const content = await readFile(loginPagePath, 'utf8');
+  const origin = await readFile(originPath, 'utf8');
+
+  assert.match(content, /data-api-base=\{API_BASE\}/);
+  assert.match(content, /getAttribute\('data-api-base'\)/);
+  assert.doesNotMatch(content, /define:vars/);
+  assert.match(content, /addEventListener\('submit', handleApiKeyConnect\)/);
+  assert.match(content, /base: API \|\| window\.location\.origin/);
+  assert.match(origin, /hasPublicOrigin/);
+  assert.match(origin, /if \(raw === '' \|\| \(typeof raw === 'string' && !raw\.trim\(\)\)\) return '';/);
 });
 
 test('auth bootstrap only trusts API keys in local storage', async () => {
