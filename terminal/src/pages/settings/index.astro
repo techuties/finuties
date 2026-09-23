@@ -1,8 +1,9 @@
 ---
 import DashboardLayout from '../../layouts/DashboardLayout.astro';
 import ConnectForm from '../../components/ConnectForm.astro';
+import { getConfiguredApiOrigin, FINUTIES_API_ORIGIN } from '../../lib/api-origin';
 
-const defaultBase = import.meta.env.PUBLIC_API_ORIGIN || 'https://data.finuties.com';
+const defaultBase = getConfiguredApiOrigin() || FINUTIES_API_ORIGIN;
 ---
 
 <DashboardLayout

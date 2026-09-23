@@ -7,12 +7,19 @@
  * - all card/modules share one request adapter with retries + header parsing
  */
 
+import {
+  FINUTIES_API_ORIGIN,
+  coerceDevProxiedApiBase,
+  getConfiguredApiOrigin,
+  isAllowedApiOrigin,
+  resolveBrowserApiOrigin,
+} from './api-origin';
+
 const STORAGE_KEY = 'finuties-api-config';
-const DEFAULT_BASE = (import.meta.env.PUBLIC_API_ORIGIN || 'https://data.finuties.com').trim();
 const ALLOW_NON_FINUTIES_API = import.meta.env.PUBLIC_ALLOW_NON_FINUTIES_API === 'true';
 
 export function getDefaultApiBase(): string {
-  return DEFAULT_BASE;
+  return resolveBrowserApiOrigin(getConfiguredApiOrigin());
 }
 
 export interface ApiConfig {
@@ -45,12 +52,11 @@ function sanitizeToken(raw: string | undefined | null): string {
   return (raw || '').trim();
 }
 
-function isFinutiesHost(hostname: string): boolean {
-  return hostname === 'data.finuties.com' || hostname.endsWith('.finuties.com');
-}
-
 export function normalizeApiBase(base: string | undefined | null): string {
-  const candidate = (base || DEFAULT_BASE).trim();
+  const candidate = (base || getConfiguredApiOrigin() || FINUTIES_API_ORIGIN).trim();
+  if (!candidate) {
+    return resolveBrowserApiOrigin('');
+  }
   try {
     const url = new URL(candidate);
     return url.origin.replace(/\/+$/, '');
@@ -61,14 +67,9 @@ export function normalizeApiBase(base: string | undefined | null): string {
 
 export function isAllowedApiBase(base: string): boolean {
   const normalized = normalizeApiBase(base);
-  if (!normalized) return false;
+  if (!normalized) return import.meta.env.DEV;
   if (ALLOW_NON_FINUTIES_API) return true;
-  try {
-    const u = new URL(normalized);
-    return isFinutiesHost(u.hostname);
-  } catch {
-    return false;
-  }
+  return isAllowedApiOrigin(normalized);
 }
 
 export function validateApiConfig(base: string, token: string): { valid: boolean; error?: string; config?: ApiConfig } {
@@ -91,8 +92,17 @@ export function getApiConfig(): ApiConfig | null {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as ApiConfig;
-    const checked = validateApiConfig(parsed.base, parsed.token);
-    return checked.valid && checked.config ? checked.config : null;
+    const base = coerceDevProxiedApiBase(parsed.base || '');
+    const checked = validateApiConfig(base, parsed.token);
+    if (checked.valid && checked.config) {
+      const migrated = coerceDevProxiedApiBase(checked.config.base);
+      if (migrated !== checked.config.base) {
+        setApiConfig(migrated, checked.config.token);
+        return { base: migrated, token: checked.config.token };
+      }
+      return checked.config;
+    }
+    return null;
   } catch {
     return null;
   }

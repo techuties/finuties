@@ -22,11 +22,14 @@ npm run dev
 | Check | Command | Expected |
 | --- | --- | --- |
 | Dev server | `npm run dev` | [http://localhost:4321](http://localhost:4321) returns HTTP **200** on `/` |
-| Unit tests | `npm test` | **7/7** pass |
+| Unit tests | `npm test` | **8/8** pass |
 | Production build | `npm run build` | Writes static site to `terminal/dist/` |
 | Dependency audit | `npm audit` | **0** critical/high (see [terminal/AUDIT.md](terminal/AUDIT.md) for history and re-run steps) |
+| Dev API proxy | `curl -sS -o /dev/null -w "%{http_code}" http://localhost:4321/health` | **200** while `npm run dev` is running |
 
-**API key (hosted API):** With no `terminal/.env`, the client calls `https://data.finuties.com`.
+**Local dev and CORS:** `https://data.finuties.com` only sends `Access-Control-Allow-Origin` for `https://terminal.finuties.com`, so a browser on `http://localhost:4321` cannot call the API directly. `npm run dev` fixes this with a **Vite proxy**: the app uses **same-origin** (`window.location.origin`) for API calls, and `astro.config.mjs` forwards `/api` and `/health` to the hosted API. The hosted Terminal at [terminal.finuties.com](https://terminal.finuties.com) does not need this proxy. Production `npm run build` output still defaults to `https://data.finuties.com` (no allowlist weakening).
+
+**API key (hosted API):**
 
 1. Request a **sandbox key** (~72 hours):
 
@@ -36,7 +39,14 @@ curl -sS -X POST https://data.finuties.com/api/v1/auth/sandbox
 
 2. Open [http://localhost:4321](http://localhost:4321) (connect page), paste the `fin_sk_...` key, and continue to the dashboard.
 
-Keys live in **browser `localStorage`** after connect — the Terminal does not read `FINUTIES_API_KEY` from env. Optional `terminal/.env` only overrides **public** build-time settings (`PUBLIC_API_ORIGIN`, `PUBLIC_GITHUB_URL`); copy from `terminal/.env.example`. **Never commit** `.env` or keys. Notebooks use a separate `notebooks/.env` for `FINUTIES_API_KEY`.
+Optional: verify the dev proxy without the browser:
+
+```bash
+# Replace KEY with fin_sk_... from the sandbox response
+curl -sS -H "Authorization: Bearer KEY" http://localhost:4321/api/v1/auth/me | head -c 200
+```
+
+Keys live in **browser `localStorage`** after connect — the Terminal does not read `FINUTIES_API_KEY` from env. Optional `terminal/.env` overrides **public** build-time settings (`PUBLIC_API_ORIGIN`, `PUBLIC_GITHUB_URL`); see `terminal/.env.example`. **Never commit** `.env` or keys. Notebooks use a separate `notebooks/.env` for `FINUTIES_API_KEY`.
 
 Full dependency audit notes: [terminal/AUDIT.md](terminal/AUDIT.md).
 

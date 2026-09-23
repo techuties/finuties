@@ -41,6 +41,18 @@ GitHub Actions CI already uses Node 22. Local dev on Node 20.x will not satisfy 
 
 After install you may see `undici@8.x` preferring Node `>=22.19.0` while CI/dev uses 22.12–22.18. This is an engine hint from a transitive dependency, not an `npm audit` finding. Upgrading the VM to Node 22.19+ silences it; audit remains clean.
 
+## Local dev CORS and API proxy (2026-09-23)
+
+**Finding:** Browsers blocked connect (`fetch` to `/api/v1/auth/me`) when the community client pointed at `https://data.finuties.com` from `http://localhost:4321` — the API’s CORS allowlist targets `https://terminal.finuties.com`, not local origins.
+
+**Mitigation (community client only):**
+
+- `astro.config.mjs` — Vite `server.proxy` for `/api` and `/health` → `https://data.finuties.com` (override target with `FINUTIES_DEV_PROXY_TARGET` if needed).
+- `src/lib/api-origin.ts` — in `import.meta.env.DEV`, default API base is same-origin; stored `data.finuties.com` bases are rewritten to the dev origin; localhost is allowed without `PUBLIC_ALLOW_NON_FINUTIES_API`.
+- **Production builds** (`npm run build`) still default to `https://data.finuties.com`; the FinUties-host allowlist is unchanged unless you explicitly set `PUBLIC_ALLOW_NON_FINUTIES_API=true`.
+
+`npm run preview` serves the production bundle from localhost and does **not** enable the dev proxy — use `npm run dev` for local connect testing, or deploy like the hosted Terminal.
+
 ## Residual risk posture
 
 - **Production**: static export (`output: "static"`). Dev-server-only issues in `vite`/`esbuild` affect local `npm run dev`, not the built site on a static host.

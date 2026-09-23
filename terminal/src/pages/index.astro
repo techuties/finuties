@@ -6,7 +6,10 @@
  *   Left panel:  Product identity, live data strip, capability highlights
  *   Right panel: FinUties API key onboarding
  */
-const API_BASE = (import.meta.env.PUBLIC_API_ORIGIN || 'https://data.finuties.com').trim();
+import { getConfiguredApiOrigin } from '../lib/api-origin';
+
+const API_BASE = getConfiguredApiOrigin();
+const DEV_USE_LOCAL_PROXY = import.meta.env.DEV;
 const ALLOW_NON_FINUTIES_API = import.meta.env.PUBLIC_ALLOW_NON_FINUTIES_API === 'true';
 const GITHUB_URL = (import.meta.env.PUBLIC_GITHUB_URL || 'https://github.com/techuties/finuties').trim();
 ---
@@ -56,25 +59,39 @@ const GITHUB_URL = (import.meta.env.PUBLIC_GITHUB_URL || 'https://github.com/tec
 <body class="h-full bg-fin-950 font-sans text-white">
 
   <!-- Auto-redirect check (runs before page paints) -->
-  <script is:inline define:vars={{ allowNonFinutiesApi: ALLOW_NON_FINUTIES_API, apiBase: API_BASE }}>
+  <script is:inline define:vars={{ allowNonFinutiesApi: ALLOW_NON_FINUTIES_API, apiBase: API_BASE, devUseLocalProxy: DEV_USE_LOCAL_PROXY }}>
   (function() {
     var ALLOW_NON_FINUTIES_API = allowNonFinutiesApi;
+    function apiOrigin() {
+      return (apiBase && apiBase.length) ? apiBase : window.location.origin;
+    }
     function allowed(base) {
       try {
         var u = new URL(base);
+        if (devUseLocalProxy && (u.hostname === 'localhost' || u.hostname === '127.0.0.1')) return true;
         if (ALLOW_NON_FINUTIES_API) return true;
         return u.hostname === 'data.finuties.com' || u.hostname.endsWith('.finuties.com');
       } catch (_) {
         return false;
       }
     }
+    function normalizeStoredBase(base) {
+      if (!base) return apiOrigin();
+      if (devUseLocalProxy) {
+        try {
+          var h = new URL(base).hostname;
+          if (h === 'data.finuties.com' || h.endsWith('.finuties.com')) return apiOrigin();
+        } catch (_) {}
+      }
+      return base.trim();
+    }
     var API = (function() {
-      var fallback = apiBase;
+      var fallback = apiOrigin();
       try {
         var raw = localStorage.getItem('finuties-api-config');
         if (!raw) return fallback;
         var cfg = JSON.parse(raw);
-        if (cfg && typeof cfg.base === 'string' && cfg.base.trim() && allowed(cfg.base.trim())) return cfg.base.trim();
+        if (cfg && typeof cfg.base === 'string' && cfg.base.trim() && allowed(cfg.base.trim())) return normalizeStoredBase(cfg.base.trim());
       } catch (e) {}
       return fallback;
     })();
@@ -285,13 +302,27 @@ const GITHUB_URL = (import.meta.env.PUBLIC_GITHUB_URL || 'https://github.com/tec
     </div>
   </div>
 
-  <script is:inline define:vars={{ allowNonFinutiesApi: ALLOW_NON_FINUTIES_API, apiBase: API_BASE }}>
+  <script is:inline define:vars={{ allowNonFinutiesApi: ALLOW_NON_FINUTIES_API, apiBase: API_BASE, devUseLocalProxy: DEV_USE_LOCAL_PROXY }}>
   var ALLOW_NON_FINUTIES_API = allowNonFinutiesApi;
+  function apiOrigin() {
+    return (apiBase && apiBase.length) ? apiBase : window.location.origin;
+  }
+  function normalizeStoredBase(base) {
+    if (!base) return apiOrigin();
+    if (devUseLocalProxy) {
+      try {
+        var h = new URL(base).hostname;
+        if (h === 'data.finuties.com' || h.endsWith('.finuties.com')) return apiOrigin();
+      } catch (_) {}
+    }
+    return base.trim();
+  }
   var API = (function() {
-    var fallback = apiBase;
+    var fallback = apiOrigin();
     function allowed(base) {
       try {
         var u = new URL(base);
+        if (devUseLocalProxy && (u.hostname === 'localhost' || u.hostname === '127.0.0.1')) return true;
         if (ALLOW_NON_FINUTIES_API) return true;
         return u.hostname === 'data.finuties.com' || u.hostname.endsWith('.finuties.com');
       } catch (_) {
@@ -302,7 +333,7 @@ const GITHUB_URL = (import.meta.env.PUBLIC_GITHUB_URL || 'https://github.com/tec
       var raw = localStorage.getItem('finuties-api-config');
       if (!raw) return fallback;
       var cfg = JSON.parse(raw);
-      if (cfg && typeof cfg.base === 'string' && cfg.base.trim() && allowed(cfg.base.trim())) return cfg.base.trim();
+      if (cfg && typeof cfg.base === 'string' && cfg.base.trim() && allowed(cfg.base.trim())) return normalizeStoredBase(cfg.base.trim());
     } catch (e) {}
     return fallback;
   })();
@@ -373,7 +404,7 @@ const GITHUB_URL = (import.meta.env.PUBLIC_GITHUB_URL || 'https://github.com/tec
     }
 
     try {
-      localStorage.setItem('finuties-api-config', JSON.stringify({ base: API, token: apiKey }));
+      localStorage.setItem('finuties-api-config', JSON.stringify({ base: apiOrigin(), token: apiKey }));
       var check = await fetch(API + '/api/v1/auth/me', {
         headers: { 'Authorization': 'Bearer ' + apiKey },
       });

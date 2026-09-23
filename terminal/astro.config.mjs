@@ -2,10 +2,18 @@ import { defineConfig } from 'astro/config';
 import tailwindcss from '@tailwindcss/vite';
 import solidJs from '@astrojs/solid-js';
 
+const FINUTIES_API_TARGET = (process.env.FINUTIES_DEV_PROXY_TARGET || 'https://data.finuties.com').replace(/\/+$/, '');
+
 export default defineConfig({
   integrations: [solidJs()],
   vite: {
     plugins: [tailwindcss()],
+    server: {
+      proxy: {
+        '/api': { target: FINUTIES_API_TARGET, changeOrigin: true, secure: true },
+        '/health': { target: FINUTIES_API_TARGET, changeOrigin: true, secure: true },
+      },
+    },
     build: {
       rollupOptions: {
         output: {

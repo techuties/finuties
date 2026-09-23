@@ -15,10 +15,26 @@ async function walk(dir) {
 
 test('api client defaults keep FinUties API-only mode', async () => {
   const apiClientPath = resolve(process.cwd(), 'src/lib/api-client.ts');
-  const content = await readFile(apiClientPath, 'utf8');
+  const originPath = resolve(process.cwd(), 'src/lib/api-origin.ts');
+  const astroConfigPath = resolve(process.cwd(), 'astro.config.mjs');
+  const apiClient = await readFile(apiClientPath, 'utf8');
+  const origin = await readFile(originPath, 'utf8');
+  const astroConfig = await readFile(astroConfigPath, 'utf8');
 
-  assert.match(content, /const DEFAULT_BASE = \(import\.meta\.env\.PUBLIC_API_ORIGIN \|\| 'https:\/\/data\.finuties\.com'\)\.trim\(\);/);
-  assert.match(content, /const ALLOW_NON_FINUTIES_API = import\.meta\.env\.PUBLIC_ALLOW_NON_FINUTIES_API === 'true';/);
+  assert.match(origin, /FINUTIES_API_ORIGIN = 'https:\/\/data\.finuties\.com'/);
+  assert.match(origin, /import\.meta\.env\.DEV && isLocalDevApiHostname/);
+  assert.match(apiClient, /const ALLOW_NON_FINUTIES_API = import\.meta\.env\.PUBLIC_ALLOW_NON_FINUTIES_API === 'true';/);
+  assert.match(astroConfig, /'\/api':.*FINUTIES_API_TARGET/);
+  assert.match(astroConfig, /'\/health':.*FINUTIES_API_TARGET/);
+});
+
+test('connect page uses same-origin API base in dev via proxy helpers', async () => {
+  const loginPagePath = resolve(process.cwd(), 'src/pages/index.astro');
+  const content = await readFile(loginPagePath, 'utf8');
+
+  assert.match(content, /getConfiguredApiOrigin/);
+  assert.match(content, /function apiOrigin\(\)/);
+  assert.match(content, /devUseLocalProxy/);
 });
 
 test('auth bootstrap only trusts API keys in local storage', async () => {
