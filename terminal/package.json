@@ -4,6 +4,10 @@
   "version": "0.1.0",
   "private": true,
   "license": "MIT",
+  "engines": {
+    "node": ">=22.12.0",
+    "npm": ">=9.6.5"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/techuties/finuties.git"
@@ -18,7 +22,7 @@
     "check": "npm run lint && npm run test && npm run build"
   },
   "dependencies": {
-    "@astrojs/solid-js": "^5.1.3",
+    "@astrojs/solid-js": "^7.0.2",
     "@deck.gl/core": "^9.2.7",
     "@deck.gl/layers": "^9.2.7",
     "@deck.gl/mapbox": "^9.2.7",
@@ -27,9 +31,9 @@
     "@tanstack/solid-table": "^8.21.3",
     "@tanstack/solid-virtual": "^3.13.18",
     "arquero": "^8.0.3",
-    "astro": "^5.0.0",
-    "echarts": "^5.5.0",
-    "maplibre-gl": "^5.18.0",
+    "astro": "^7.3.4",
+    "echarts": "^6.1.0",
+    "maplibre-gl": "^6.11.1",
     "nanostores": "^1.1.0",
     "regression": "^2.0.1",
     "simple-statistics": "^7.8.3",

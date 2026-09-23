@@ -9,9 +9,9 @@ export default defineConfig({
     build: {
       rollupOptions: {
         output: {
-          manualChunks: {
-            echarts: ['echarts'],
-            stats: ['simple-statistics'],
+          manualChunks(id) {
+            if (id.includes('node_modules/echarts')) return 'echarts';
+            if (id.includes('node_modules/simple-statistics')) return 'stats';
           },
         },
       },

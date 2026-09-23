@@ -1,7 +1,7 @@
 ---
 import '../styles/global.css';
 import CookieConsent from '../components/CookieConsent.astro';
-import { ViewTransitions } from 'astro:transitions';
+import { ClientRouter } from 'astro:transitions';
 
 interface Props {
   title: string;
@@ -30,7 +30,7 @@ const API_ORIGIN = import.meta.env.PUBLIC_API_ORIGIN || 'https://data.finuties.c
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <ViewTransitions />
+    <ClientRouter />
     <!-- Metrility GDPR pixel — always loaded, no cookies -->
     <script defer src="https://metrility.techuties.com/pixel/c3uccz757lWXiLzL"></script>
     <!-- Full Metrility pixel — loaded only if user accepted cookies -->

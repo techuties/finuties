@@ -56,9 +56,9 @@ const GITHUB_URL = (import.meta.env.PUBLIC_GITHUB_URL || 'https://github.com/tec
 <body class="h-full bg-fin-950 font-sans text-white">
 
   <!-- Auto-redirect check (runs before page paints) -->
-  <script is:inline>
+  <script is:inline define:vars={{ allowNonFinutiesApi: ALLOW_NON_FINUTIES_API, apiBase: API_BASE }}>
   (function() {
-    var ALLOW_NON_FINUTIES_API = {ALLOW_NON_FINUTIES_API ? 'true' : 'false'} === 'true';
+    var ALLOW_NON_FINUTIES_API = allowNonFinutiesApi;
     function allowed(base) {
       try {
         var u = new URL(base);
@@ -69,7 +69,7 @@ const GITHUB_URL = (import.meta.env.PUBLIC_GITHUB_URL || 'https://github.com/tec
       }
     }
     var API = (function() {
-      var fallback = {JSON.stringify(API_BASE)};
+      var fallback = apiBase;
       try {
         var raw = localStorage.getItem('finuties-api-config');
         if (!raw) return fallback;
@@ -285,10 +285,10 @@ const GITHUB_URL = (import.meta.env.PUBLIC_GITHUB_URL || 'https://github.com/tec
     </div>
   </div>
 
-  <script is:inline>
-  var ALLOW_NON_FINUTIES_API = {ALLOW_NON_FINUTIES_API ? 'true' : 'false'} === 'true';
+  <script is:inline define:vars={{ allowNonFinutiesApi: ALLOW_NON_FINUTIES_API, apiBase: API_BASE }}>
+  var ALLOW_NON_FINUTIES_API = allowNonFinutiesApi;
   var API = (function() {
-    var fallback = {JSON.stringify(API_BASE)};
+    var fallback = apiBase;
     function allowed(base) {
       try {
         var u = new URL(base);
