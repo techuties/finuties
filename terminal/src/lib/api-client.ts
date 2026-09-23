@@ -8,7 +8,6 @@
  */
 
 import {
-  FINUTIES_API_ORIGIN,
   coerceDevProxiedApiBase,
   getConfiguredApiOrigin,
   isAllowedApiOrigin,
@@ -53,14 +52,12 @@ function sanitizeToken(raw: string | undefined | null): string {
 }
 
 export function normalizeApiBase(base: string | undefined | null): string {
-  let candidate = (base ?? '').trim();
-  if (!candidate) {
-    const configured = getConfiguredApiOrigin();
-    if (configured === '') return resolveBrowserApiOrigin('');
-    candidate = configured || FINUTIES_API_ORIGIN;
+  const trimmed = (base ?? '').trim();
+  if (!trimmed) {
+    return resolveBrowserApiOrigin(getConfiguredApiOrigin());
   }
   try {
-    const url = new URL(candidate);
+    const url = new URL(trimmed);
     return url.origin.replace(/\/+$/, '');
   } catch {
     return '';
@@ -69,7 +66,7 @@ export function normalizeApiBase(base: string | undefined | null): string {
 
 export function isAllowedApiBase(base: string): boolean {
   const normalized = normalizeApiBase(base);
-  if (!normalized) return import.meta.env.DEV;
+  if (!normalized) return false;
   if (ALLOW_NON_FINUTIES_API) return true;
   return isAllowedApiOrigin(normalized);
 }
@@ -94,15 +91,21 @@ export function getApiConfig(): ApiConfig | null {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as ApiConfig;
-    const base = coerceDevProxiedApiBase(parsed.base || '');
+    const rawBase = (parsed.base ?? '').trim();
+    const base = rawBase
+      ? coerceDevProxiedApiBase(rawBase)
+      : resolveBrowserApiOrigin('');
     const checked = validateApiConfig(base, parsed.token);
     if (checked.valid && checked.config) {
-      const migrated = coerceDevProxiedApiBase(checked.config.base);
-      if (migrated !== checked.config.base) {
-        setApiConfig(migrated, checked.config.token);
-        return { base: migrated, token: checked.config.token };
+      const resolved = checked.config;
+      const storedBase = rawBase;
+      const needsPersist = !storedBase
+        || storedBase !== resolved.base
+        || coerceDevProxiedApiBase(storedBase) !== resolved.base;
+      if (needsPersist) {
+        setApiConfig(resolved.base, resolved.token);
       }
-      return checked.config;
+      return resolved;
     }
     return null;
   } catch {

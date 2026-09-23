@@ -39,12 +39,25 @@ export function getConfiguredApiOrigin(): string {
 
 /** Resolve the API origin in the browser (connect page, settings). */
 export function resolveBrowserApiOrigin(configuredOrigin?: string): string {
-  const candidate = (configuredOrigin || '').trim();
+  const candidate = (configuredOrigin ?? '').trim();
   if (candidate) return candidate.replace(/\/+$/, '');
   if (typeof window !== 'undefined') {
     return window.location.origin.replace(/\/+$/, '');
   }
-  return getConfiguredApiOrigin() || FINUTIES_API_ORIGIN;
+  const configured = getConfiguredApiOrigin();
+  if (configured === '') return '';
+  return configured || FINUTIES_API_ORIGIN;
+}
+
+/** True when the API base is the current page origin (local dev proxy / same-origin deploy). */
+export function isSameOriginApiBase(origin: string): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const normalized = (origin || '').trim().replace(/\/+$/, '');
+    return normalized === window.location.origin.replace(/\/+$/, '');
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -69,6 +82,7 @@ export function coerceDevProxiedApiBase(base: string): string {
 export function isAllowedApiOrigin(origin: string): boolean {
   const normalized = (origin || '').trim();
   if (!normalized) return import.meta.env.DEV;
+  if (isSameOriginApiBase(normalized)) return true;
   try {
     const u = new URL(normalized);
     if (import.meta.env.PUBLIC_ALLOW_NON_FINUTIES_API === 'true') return true;

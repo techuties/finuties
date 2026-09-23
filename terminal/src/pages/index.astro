@@ -386,7 +386,10 @@ const GITHUB_URL = (import.meta.env.PUBLIC_GITHUB_URL || 'https://github.com/tec
     }
 
     try {
-      localStorage.setItem('finuties-api-config', JSON.stringify({ base: apiOrigin(), token: apiKey }));
+      localStorage.setItem('finuties-api-config', JSON.stringify({
+        base: API || window.location.origin,
+        token: apiKey,
+      }));
       var check = await fetch(API + '/api/v1/auth/me', {
         headers: { 'Authorization': 'Bearer ' + apiKey },
       });

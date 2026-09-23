@@ -48,7 +48,8 @@ After install you may see `undici@8.x` preferring Node `>=22.19.0` while CI/dev 
 **Mitigation (community client only):**
 
 - `astro.config.mjs` — Vite `server.proxy` for `/api` and `/health` → `https://data.finuties.com` (override target with `FINUTIES_DEV_PROXY_TARGET` if needed).
-- `src/lib/api-origin.ts` — `PUBLIC_API_ORIGIN` unset → dev defaults to same-origin (`''`), production to hosted API; `PUBLIC_API_ORIGIN=` (empty) → same-origin in any mode. Stored `data.finuties.com` bases are rewritten to the dev origin in DEV; localhost is allowed without `PUBLIC_ALLOW_NON_FINUTIES_API`.
+- `src/lib/api-origin.ts` — `PUBLIC_API_ORIGIN` unset → dev defaults to same-origin (`''`), production to hosted API; `PUBLIC_API_ORIGIN=` (empty) → same-origin in any mode (never `PUBLIC_API_ORIGIN || hosted`). Stored `data.finuties.com` bases are rewritten to the dev origin in DEV; same-origin and localhost are allowed without `PUBLIC_ALLOW_NON_FINUTIES_API`.
+- `src/lib/api-client.ts` — empty saved `base` resolves to `window.location.origin`; connect persists `API || window.location.origin` so dashboard modules do not fall back to hosted URL and hit CORS.
 - **Production builds** (`npm run build`) still default to `https://data.finuties.com`; the FinUties-host allowlist is unchanged unless you explicitly set `PUBLIC_ALLOW_NON_FINUTIES_API=true`.
 
 `npm run preview` serves the production bundle from localhost and does **not** enable the dev proxy — use `npm run dev` for local connect testing, or deploy like the hosted Terminal.
