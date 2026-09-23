@@ -21,8 +21,9 @@ jobs:
       - name: Validate notebooks (static)
         run: node tools/validate-notebooks.mjs
 
-      - name: Terminal unit tests
+      - name: Terminal unit tests and build
         working-directory: terminal
         run: |
           npm ci
           npm test
+          npm run build
