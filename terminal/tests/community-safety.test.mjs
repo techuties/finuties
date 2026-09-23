@@ -28,13 +28,18 @@ test('api client defaults keep FinUties API-only mode', async () => {
   assert.match(astroConfig, /'\/health':.*FINUTIES_API_TARGET/);
 });
 
-test('connect page uses same-origin API base in dev via proxy helpers', async () => {
+test('connect page uses body data attributes for inline scripts (no define:vars)', async () => {
   const loginPagePath = resolve(process.cwd(), 'src/pages/index.astro');
+  const originPath = resolve(process.cwd(), 'src/lib/api-origin.ts');
   const content = await readFile(loginPagePath, 'utf8');
+  const origin = await readFile(originPath, 'utf8');
 
-  assert.match(content, /getConfiguredApiOrigin/);
-  assert.match(content, /function apiOrigin\(\)/);
-  assert.match(content, /devUseLocalProxy/);
+  assert.match(content, /data-api-base=\{API_BASE\}/);
+  assert.match(content, /getAttribute\('data-api-base'\)/);
+  assert.doesNotMatch(content, /define:vars/);
+  assert.match(content, /addEventListener\('submit', handleApiKeyConnect\)/);
+  assert.match(origin, /hasPublicOrigin/);
+  assert.match(origin, /if \(raw === '' \|\| \(typeof raw === 'string' && !raw\.trim\(\)\)\) return '';/);
 });
 
 test('auth bootstrap only trusts API keys in local storage', async () => {

@@ -25,7 +25,7 @@ Transitive fixes landed via the lockfile refresh (e.g. `vite`, `sharp`, `svgo`, 
 Small, required compile/runtime updates (no product behavior change):
 
 - `ViewTransitions` → `ClientRouter` (`astro:transitions`) in `src/layouts/DashboardLayout.astro`.
-- Connect page inline scripts: use `define:vars` instead of ternary/`JSON.stringify` expressions inside `is:inline` blocks (`src/pages/index.astro`) — Astro 7’s compiler rejects those patterns.
+- Connect page (`src/pages/index.astro`): **do not** use Astro expressions or `define:vars` inside `<script is:inline>` (they can be emitted literally → SyntaxError; `define:vars` is incompatible with `is:inline`). Pass config via `<body data-api-base=…>` and read with `getAttribute`. Bind the connect form with `addEventListener('submit', …)` so a script error cannot fall back to native form submit.
 - `vite.build.rollupOptions.output.manualChunks`: object form → function (Rolldown / Vite 8).
 
 ## Runtime requirements
@@ -48,7 +48,7 @@ After install you may see `undici@8.x` preferring Node `>=22.19.0` while CI/dev 
 **Mitigation (community client only):**
 
 - `astro.config.mjs` — Vite `server.proxy` for `/api` and `/health` → `https://data.finuties.com` (override target with `FINUTIES_DEV_PROXY_TARGET` if needed).
-- `src/lib/api-origin.ts` — in `import.meta.env.DEV`, default API base is same-origin; stored `data.finuties.com` bases are rewritten to the dev origin; localhost is allowed without `PUBLIC_ALLOW_NON_FINUTIES_API`.
+- `src/lib/api-origin.ts` — `PUBLIC_API_ORIGIN` unset → dev defaults to same-origin (`''`), production to hosted API; `PUBLIC_API_ORIGIN=` (empty) → same-origin in any mode. Stored `data.finuties.com` bases are rewritten to the dev origin in DEV; localhost is allowed without `PUBLIC_ALLOW_NON_FINUTIES_API`.
 - **Production builds** (`npm run build`) still default to `https://data.finuties.com`; the FinUties-host allowlist is unchanged unless you explicitly set `PUBLIC_ALLOW_NON_FINUTIES_API=true`.
 
 `npm run preview` serves the production bundle from localhost and does **not** enable the dev proxy — use `npm run dev` for local connect testing, or deploy like the hosted Terminal.

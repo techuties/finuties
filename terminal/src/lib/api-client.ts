@@ -53,9 +53,11 @@ function sanitizeToken(raw: string | undefined | null): string {
 }
 
 export function normalizeApiBase(base: string | undefined | null): string {
-  const candidate = (base || getConfiguredApiOrigin() || FINUTIES_API_ORIGIN).trim();
+  let candidate = (base ?? '').trim();
   if (!candidate) {
-    return resolveBrowserApiOrigin('');
+    const configured = getConfiguredApiOrigin();
+    if (configured === '') return resolveBrowserApiOrigin('');
+    candidate = configured || FINUTIES_API_ORIGIN;
   }
   try {
     const url = new URL(candidate);

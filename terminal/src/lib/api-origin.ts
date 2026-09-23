@@ -16,10 +16,23 @@ export function isLocalDevApiHostname(hostname: string): boolean {
   return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
 }
 
-/** Build-time / SSR default passed into inline scripts (empty in dev → browser uses location.origin). */
+/**
+ * Build-time API origin for pages and the API client.
+ *
+ * - `PUBLIC_API_ORIGIN` unset → dev: same-origin (`''`); production: hosted API.
+ * - `PUBLIC_API_ORIGIN=` (empty) → same-origin (`''`) in any mode (use with dev proxy).
+ * - `PUBLIC_API_ORIGIN=https://...` → explicit origin (trimmed, no trailing slash).
+ */
 export function getConfiguredApiOrigin(): string {
-  const explicit = (import.meta.env.PUBLIC_API_ORIGIN || '').trim();
-  if (explicit) return explicit.replace(/\/+$/, '');
+  const env = import.meta.env;
+  const hasPublicOrigin = Object.prototype.hasOwnProperty.call(env, 'PUBLIC_API_ORIGIN');
+  if (hasPublicOrigin) {
+    const raw = env.PUBLIC_API_ORIGIN;
+    if (raw === '' || (typeof raw === 'string' && !raw.trim())) return '';
+    if (typeof raw === 'string' && raw.trim()) {
+      return raw.trim().replace(/\/+$/, '');
+    }
+  }
   if (import.meta.env.DEV) return '';
   return FINUTIES_API_ORIGIN;
 }
