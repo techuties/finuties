@@ -7,5 +7,8 @@ notebooks/.venv/
 notebooks/.ipynb_checkpoints/
 terminal/.env
 terminal/node_modules/
+api/.pytest_cache/
+api/**/__pycache__/
+api/*.egg-info/
 .DS_Store
 

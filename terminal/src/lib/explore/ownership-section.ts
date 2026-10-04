@@ -29,7 +29,7 @@ registerSection({
 
   async fetch(p: EntityParams): Promise<SectionData> {
     const qps: string[] = [];
-    if (p.cik) qps.push('cik=' + p.cik);
+    if (p.cik) qps.push('issuer_cik=' + encodeURIComponent(p.cik));
     qps.push('limit=25');
     return sectionFetch('/api/v1/sec/beneficial-ownership?' + qps.join('&'));
   },
