@@ -223,8 +223,10 @@ identity holds on all **35** points. Id **8** is
 **−276** at that stamp, negative on **3** points,
 min **−276**, max **3,340**. Id **7** is **18,319**.
 `date=2026-10-28` returned HTTP **403** HTML. Keep
-yesterday's completed **96**-point day. A **403** is
-not that body. CND Panama `update`
+yesterday's **35**-point window for that date (id
+**8** **−276** was that morning's last point, not a
+finished day). The completed **96**-point day is
+**27 October**. A **403** is not either body. CND Panama `update`
 **29-octubre-2026 3:06:29**. Hydro **1,144.92**,
 thermal **307.00**, solar **0.00**, wind **107.30**.
 Pie sum **1,559.22**. Renewable **1,252.22** equals
@@ -355,9 +357,10 @@ workbook, and the different **27 October** file of
 the same byte length, into #457. The TransnetBW
 October files into #454. The Amprion **28–29
 October** files into #455. The **2026-10-29**
-Svenska kraftnät window into #443. The completed
-**28 October** day stays yesterday's print because
-today's call was **403**. The **2026-10-29 3:06:29**
+Svenska kraftnät window into #443. The **28 October**
+call was **403**, so yesterday's **35**-point window
+for that date stays. The completed **96**-point day
+remains **27 October**. The **2026-10-29 3:06:29**
 CND Panama snapshot into #444. The **28 October**
 JAO UTC day, the Core maximum-exchange window, and
 the Nordic border-flow window into #446. The
@@ -11078,7 +11081,7 @@ notes retained where still accurate). This run's FinUties `GET /health` returned
 | Nord Pool day-ahead SYS *(recheck)* | 200 | `date=2026-10-29` **96** quarters **33.17–156.57**; `date=2026-10-27/28` prices unchanged from the 2026-10-28 print |
 | OKTE DAM results *(recheck)* | 200 | JSON; delivery **2026-10-29** **96** quarters, all final; `price` **216.66–547.33**; `flowHuSk` and `flowSkCz` **0** on all **96**; `flowSkPl` non-zero on **30** periods |
 | Elering system balance *(recheck)* | 200 | JSON; last real point **2026-10-29T06:45:00Z** production **707.56** / consumption **898.61** / balance **−191.06**; that point off by **0.01**; **17** of **28** points exact; solar null |
-| Svenska kraftnät production *(recheck)* | 200/403 | `date=2026-10-29` **35** points, identity exact, id **8** **−276**; `date=2026-10-28` HTTP **403** HTML. Keep yesterday's **96**-point day |
+| Svenska kraftnät production *(recheck)* | 200/403 | `date=2026-10-29` **35** points, identity exact, id **8** **−276**; `date=2026-10-28` HTTP **403** HTML. Keep yesterday's **35**-point **28 October** window. The completed **96**-point day is **27 October** |
 | CND Panama `gen.json` *(recheck)* | 200 | JSON **25,994** bytes; `update` **29-octubre-2026 3:06:29**; hydro **1,144.92** / thermal **307.00** / solar **0.00** / wind **107.30**; renewable exact; unit sum gap **1.16** |
 | JAO Core schedules 28 Oct *(recheck)* | 200 | JSON **182,441** bytes; **96** quarters; **58** borders; **2,990** zeros; no negatives; last `border_DE_AT` **1,897.0** and `border_AT_DE` **0** |
 | JAO Core `maxExchanges` *(recheck)* | 200 | JSON **68,104** bytes; **14** hourly rows through **2026-10-29T11:00:00Z**; **150** borders; **28** zeros; no negatives; last `border_AT_DE` **5,475** |
